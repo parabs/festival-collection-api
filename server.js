@@ -105,9 +105,7 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
         donation_id: donationId,
         mandal: req.mandalName
       },
-      // FIXED: Use full URL + UPPERCASE POST
-      callback_url: 'https://festival-collection-api.onrender.com/api/webhook',
-      callback_method: 'POST'
+
     };
 
     const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
