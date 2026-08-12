@@ -118,7 +118,7 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
       },
       // For now, callback is placeholder. We'll add webhook later.
       callback_url: `https://${req.get('host') || 'localhost'}/api/webhook`,
-      callback_method: 'post'
+      callback_method: 'POST'
     };
 
     const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
