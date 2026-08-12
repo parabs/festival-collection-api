@@ -1,10 +1,12 @@
 // ============================================
-// FESTIVAL COLLECTION API - CENTRAL SERVER
-// STEP 1: Basic Server with Health Check (FIXED)
+// FESTIVAL COLLECTION API - CENTRAL SERVER (FULL)
+// STEP 2: Razorpay Payment Link Generation
 // ============================================
 
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -13,16 +15,160 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Health check endpoint - test if server is running
+// ============================================
+// CONFIG - Read from Environment Variables
+// ============================================
+
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+  console.error('❌ Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment!');
+}
+
+// ============================================
+// TEMPORARY API KEY STORE (In-memory)
+// In production, move to a database.
+// ============================================
+
+const API_KEYS = {
+  // Add your mandal keys here with expiry dates
+  // Example: "MANDAL_GANPATI_MUMBAI_2026": {
+  //   mandalName: "Shree Ganpati Mandal, Mumbai",
+  //   expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
+  //   isActive: true
+  // }
+};
+
+// We'll add this properly in Step 3. For now, let's keep a test key
+// so we can test the Razorpay link generation.
+API_KEYS['TEST_KEY_123'] = {
+  mandalName: "Test Mandal",
+  expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
+  isActive: true
+};
+
+// ============================================
+// MIDDLEWARE: Validate API Key
+// ============================================
+
+function validateApiKey(req, res, next) {
+  const { apiKey } = req.body;
+
+  if (!apiKey) {
+    return res.status(401).json({ error: 'Missing API Key' });
+  }
+
+  const keyData = API_KEYS[apiKey];
+
+  if (!keyData) {
+    return res.status(401).json({ error: 'Invalid API Key' });
+  }
+
+  if (!keyData.isActive) {
+    return res.status(403).json({ error: 'API Key is deactivated' });
+  }
+
+  if (keyData.expiresAt < Date.now()) {
+    return res.status(403).json({ error: 'API Key has expired. Please renew.' });
+  }
+
+  req.mandalName = keyData.mandalName;
+  next();
+}
+
+// ============================================
+// ENDPOINT 1: Generate Razorpay Payment Link
+// POST /api/generate-link
+// ============================================
+
+app.post('/api/generate-link', validateApiKey, async (req, res) => {
+  try {
+    const { amount, name, mobile, donationId } = req.body;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    if (!donationId) {
+      return res.status(400).json({ error: 'Missing donationId' });
+    }
+
+    console.log(`📝 Generating link for ${name} | ₹${amount} | ${donationId}`);
+
+    const amountInPaise = Math.round(parseFloat(amount) * 100);
+    const receiptId = 'receipt_' + donationId;
+
+    const payload = {
+      amount: amountInPaise,
+      currency: 'INR',
+      accept_partial: false,
+      expire_by: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
+      reference_id: donationId,
+      description: `Contribution to ${req.mandalName}`,
+      customer: {
+        name: name || 'Anonymous Supporter',
+        contact: mobile.replace(/\s/g, '')
+      },
+      notify: { sms: false, email: false, whatsapp: false },
+      reminder_enable: false,
+      notes: {
+        donation_id: donationId,
+        mandal: req.mandalName
+      },
+      // For now, callback is placeholder. We'll add webhook later.
+      callback_url: `https://${req.get('host') || 'localhost'}/api/webhook`,
+      callback_method: 'post'
+    };
+
+    const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
+
+    const response = await axios.post(
+      'https://api.razorpay.com/v1/payment_links',
+      payload,
+      {
+        headers: {
+          'Authorization': 'Basic ' + auth,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const link = response.data.short_url;
+
+    if (!link) {
+      throw new Error('Razorpay did not return a link');
+    }
+
+    console.log(`✅ Link generated: ${link}`);
+    return res.json({ success: true, payment_link: link });
+
+  } catch (error) {
+    console.error('❌ Generate Link Error:', error.response?.data || error.message);
+    return res.status(500).json({
+      error: 'Failed to generate payment link',
+      details: error.response?.data?.error?.description || error.message
+    });
+  }
+});
+
+// ============================================
+// ENDPOINT 2: Health Check
+// GET /api/health
+// ============================================
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Festival Collection API is running!',
+    razorpay_configured: !!(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
+    activeKeys: Object.keys(API_KEYS).length,
     timestamp: new Date().toISOString()
   });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`💳 Razorpay: ${RAZORPAY_KEY_ID ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
 });
