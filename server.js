@@ -1,6 +1,5 @@
 // ============================================
-// FESTIVAL COLLECTION API - CENTRAL SERVER (FULL)
-// STEP 2: Razorpay Payment Link Generation
+// FESTIVAL COLLECTION API - CENTRAL SERVER (FIXED)
 // ============================================
 
 const express = require('express');
@@ -27,25 +26,15 @@ if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
 }
 
 // ============================================
-// TEMPORARY API KEY STORE (In-memory)
-// In production, move to a database.
+// TEMPORARY API KEY STORE
 // ============================================
 
 const API_KEYS = {
-  // Add your mandal keys here with expiry dates
-  // Example: "MANDAL_GANPATI_MUMBAI_2026": {
-  //   mandalName: "Shree Ganpati Mandal, Mumbai",
-  //   expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
-  //   isActive: true
-  // }
-};
-
-// We'll add this properly in Step 3. For now, let's keep a test key
-// so we can test the Razorpay link generation.
-API_KEYS['TEST_KEY_123'] = {
-  mandalName: "Test Mandal",
-  expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
-  isActive: true
+  'TEST_KEY_123': {
+    mandalName: "Test Mandal",
+    expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
+    isActive: true
+  }
 };
 
 // ============================================
@@ -116,8 +105,8 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
         donation_id: donationId,
         mandal: req.mandalName
       },
-      // For now, callback is placeholder. We'll add webhook later.
-      callback_url: `https://${req.get('host') || 'localhost'}/api/webhook`,
+      // FIXED: Use full URL + UPPERCASE POST
+      callback_url: 'https://festival-collection-api.onrender.com/api/webhook',
       callback_method: 'POST'
     };
 
@@ -153,7 +142,17 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 2: Health Check
+// ENDPOINT 2: Webhook (Placeholder)
+// POST /api/webhook
+// ============================================
+
+app.post('/api/webhook', (req, res) => {
+  console.log('📨 Webhook received:', req.body);
+  res.status(200).send('OK');
+});
+
+// ============================================
+// ENDPOINT 3: Health Check
 // GET /api/health
 // ============================================
 
