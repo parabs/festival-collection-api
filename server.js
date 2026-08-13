@@ -1,11 +1,11 @@
 // ============================================
-// FESTIVAL COLLECTION API - CENTRAL SERVER (FIXED)
+// FESTIVAL COLLECTION API - CENTRAL SERVER
+// STEP 3: WhatsApp Integration Added
 // ============================================
 
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -21,12 +21,22 @@ const PORT = process.env.PORT || 3000;
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
+// WhatsApp Config
+const WHATSAPP_PROVIDER = process.env.WHATSAPP_PROVIDER || 'twilio';
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+
 if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
   console.error('❌ Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment!');
 }
 
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_NUMBER) {
+  console.warn('⚠️ Twilio credentials missing. WhatsApp will not work.');
+}
+
 // ============================================
-// TEMPORARY API KEY STORE
+// API KEY STORE (In-memory)
 // ============================================
 
 const API_KEYS = {
@@ -86,7 +96,6 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
     console.log(`📝 Generating link for ${name} | ₹${amount} | ${donationId}`);
 
     const amountInPaise = Math.round(parseFloat(amount) * 100);
-    const receiptId = 'receipt_' + donationId;
 
     const payload = {
       amount: amountInPaise,
@@ -104,8 +113,7 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
       notes: {
         donation_id: donationId,
         mandal: req.mandalName
-      },
-
+      }
     };
 
     const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
@@ -140,14 +148,66 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 2: Webhook (Placeholder)
-// POST /api/webhook
+// ENDPOINT 2: Send WhatsApp Message
+// POST /api/send-message
 // ============================================
 
-app.post('/api/webhook', (req, res) => {
-  console.log('📨 Webhook received:', req.body);
-  res.status(200).send('OK');
+app.post('/api/send-message', validateApiKey, async (req, res) => {
+  try {
+    const { mobile, message } = req.body;
+
+    if (!mobile || !message) {
+      return res.status(400).json({ error: 'Missing mobile or message' });
+    }
+
+    console.log(`📱 Sending WhatsApp to ${mobile}`);
+
+    const result = await sendWhatsAppMessage(mobile, message);
+    return res.json({ success: true, result });
+
+  } catch (error) {
+    console.error('❌ Send Message Error:', error.message);
+    return res.status(500).json({ error: 'Failed to send message' });
+  }
 });
+
+// ============================================
+// WHATSAPP SENDER FUNCTION
+// ============================================
+
+async function sendWhatsAppMessage(mobile, message) {
+  // Clean mobile number
+  const cleanMobile = mobile.replace(/\s/g, '');
+  const finalMobile = cleanMobile.startsWith('+') ? cleanMobile : '+' + cleanMobile;
+
+  // --- Twilio ---
+  if (WHATSAPP_PROVIDER === 'twilio') {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+    const auth = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
+
+    const params = new URLSearchParams();
+    params.append('To', 'whatsapp:' + finalMobile);
+    params.append('From', TWILIO_WHATSAPP_NUMBER);
+    params.append('Body', message);
+
+    const response = await axios.post(url, params, {
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    console.log(`✅ WhatsApp sent to ${finalMobile}`);
+    return response.data;
+  }
+
+  else {
+    console.log('⚠️ No WhatsApp provider configured. Message preview:');
+    console.log('To:', finalMobile);
+    console.log('Message:', message);
+    return { status: 'logged' };
+  }
+}
 
 // ============================================
 // ENDPOINT 3: Health Check
@@ -159,13 +219,19 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'Festival Collection API is running!',
     razorpay_configured: !!(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
+    whatsapp_configured: !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_WHATSAPP_NUMBER),
     activeKeys: Object.keys(API_KEYS).length,
     timestamp: new Date().toISOString()
   });
 });
 
+// ============================================
+// START SERVER
+// ============================================
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`💳 Razorpay: ${RAZORPAY_KEY_ID ? '✅ Configured' : '❌ Not configured'}`);
+  console.log(`📱 WhatsApp: ${TWILIO_ACCOUNT_SID ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
 });
