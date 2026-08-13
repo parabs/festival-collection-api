@@ -325,6 +325,80 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
+// WHATSAPP WEBHOOK – META CLOUD API
+// ============================================
+
+// Meta webhook verification
+app.get('/api/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (
+    mode === 'subscribe' &&
+    token === process.env.META_WEBHOOK_VERIFY_TOKEN
+  ) {
+    console.log('✅ Meta webhook verified');
+    return res.status(200).send(challenge);
+  }
+
+  console.error('❌ Meta webhook verification failed');
+  return res.sendStatus(403);
+});
+
+
+// Receive WhatsApp webhook events
+app.post('/api/webhook', (req, res) => {
+  try {
+    console.log('📩 WhatsApp webhook received');
+
+    const body = req.body;
+
+    console.log(
+      '📦 Webhook payload:',
+      JSON.stringify(body, null, 2)
+    );
+
+    // Process WhatsApp status updates
+    const entries = body.entry || [];
+
+    entries.forEach(entry => {
+      const changes = entry.changes || [];
+
+      changes.forEach(change => {
+        const value = change.value || {};
+
+        const statuses = value.statuses || [];
+
+        statuses.forEach(status => {
+          console.log(
+            `📱 WhatsApp status: ${status.id} → ${status.status}`
+          );
+
+          if (status.recipient_id) {
+            console.log(
+              `👤 Recipient: ${status.recipient_id}`
+            );
+          }
+        });
+      });
+    });
+
+    // Meta expects HTTP 200
+    return res.sendStatus(200);
+
+  } catch (error) {
+    console.error(
+      '❌ WhatsApp webhook error:',
+      error.message
+    );
+
+    // Still acknowledge the webhook
+    return res.sendStatus(200);
+  }
+});
+
+// ============================================
 // START SERVER
 // ============================================
 
