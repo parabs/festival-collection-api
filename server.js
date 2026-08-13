@@ -1,6 +1,6 @@
 // ============================================
 // FESTIVAL COLLECTION API - CENTRAL SERVER
-// STEP 3: WhatsApp Integration Added
+// STEP 3: Meta WhatsApp Cloud API Integration
 // ============================================
 
 const express = require('express');
@@ -18,21 +18,25 @@ const PORT = process.env.PORT || 3000;
 // CONFIG - Read from Environment Variables
 // ============================================
 
+// Razorpay
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
-// WhatsApp Config
-const WHATSAPP_PROVIDER = process.env.WHATSAPP_PROVIDER || 'twilio';
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+// WhatsApp - Meta Cloud API
+const WHATSAPP_PROVIDER = process.env.WHATSAPP_PROVIDER || 'meta';
+const META_PHONE_NUMBER_ID = process.env.META_PHONE_NUMBER_ID;
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION;
 
 if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
   console.error('❌ Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment!');
 }
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_NUMBER) {
-  console.warn('⚠️ Twilio credentials missing. WhatsApp will not work.');
+if (WHATSAPP_PROVIDER === 'meta') {
+  if (!META_PHONE_NUMBER_ID || !META_ACCESS_TOKEN || !META_GRAPH_VERSION) {
+    console.warn('⚠️ Meta WhatsApp credentials missing. WhatsApp messaging will not work.');
+    console.warn('⚠️ Required: META_PHONE_NUMBER_ID, META_ACCESS_TOKEN, META_GRAPH_VERSION');
+  }
 }
 
 // ============================================
@@ -148,7 +152,7 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 2: Send WhatsApp Message
+// ENDPOINT 2: Send WhatsApp Message (Text)
 // POST /api/send-message
 // ============================================
 
@@ -172,59 +176,139 @@ app.post('/api/send-message', validateApiKey, async (req, res) => {
 });
 
 // ============================================
-// WHATSAPP SENDER FUNCTION
+// ENDPOINT 3: Send WhatsApp Template (Production)
+// POST /api/send-template
+// ============================================
+
+app.post('/api/send-template', validateApiKey, async (req, res) => {
+  try {
+    const { mobile, templateName, variables, language } = req.body;
+
+    if (!mobile || !templateName) {
+      return res.status(400).json({ error: 'Missing mobile or templateName' });
+    }
+
+    console.log(`📱 Sending template ${templateName} to ${mobile}`);
+
+    const result = await sendWhatsAppTemplate(mobile, templateName, variables || [], language || 'en_IN');
+    return res.json({ success: true, result });
+
+  } catch (error) {
+    console.error('❌ Send Template Error:', error.message);
+    return res.status(500).json({ error: 'Failed to send template' });
+  }
+});
+
+// ============================================
+// WHATSAPP SENDER – META CLOUD API (TEXT)
 // ============================================
 
 async function sendWhatsAppMessage(mobile, message) {
   try {
-    console.log(`🔍 Starting WhatsApp send to: ${mobile}`);
-    console.log(`📝 Message: ${message.substring(0, 50)}...`);
-    // Clean and format the recipient number
-    const cleanMobile = mobile.replace(/\s/g, '');
-    const finalMobile = cleanMobile.startsWith('+') ? cleanMobile : '+' + cleanMobile;
-    const recipient = 'whatsapp:' + finalMobile;
-
-    console.log(`📱 Formatted recipient: ${recipient}`);
-    console.log(`📱 From: ${TWILIO_WHATSAPP_NUMBER}`);
-
-    // --- Twilio ---
-    if (WHATSAPP_PROVIDER === 'twilio') {
-      console.log('🔍 Using Twilio provider');
-      const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-      const auth = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
-
-      const params = new URLSearchParams();
-      params.append('To', recipient);
-      params.append('From', TWILIO_WHATSAPP_NUMBER);
-      params.append('Body', message);
-
-      console.log('🔍 Sending request to Twilio...');
-
-      const response = await axios.post(url, params, {
-        headers: {
-          'Authorization': 'Basic ' + auth,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      console.log(`✅ WhatsApp sent to ${recipient}`);
-      return response.data;
+    if (WHATSAPP_PROVIDER !== 'meta') {
+      throw new Error(`Unsupported WhatsApp provider: ${WHATSAPP_PROVIDER}`);
     }
 
-    else {
-      console.log('⚠️ No WhatsApp provider configured. Message preview:');
-      console.log('To:', recipient);
-      console.log('Message:', message);
-      return { status: 'logged' };
+    if (!META_PHONE_NUMBER_ID || !META_ACCESS_TOKEN || !META_GRAPH_VERSION) {
+      throw new Error('Meta WhatsApp credentials are not configured');
     }
+
+    // Clean recipient number – remove + for Meta API
+    const cleanMobile = String(mobile).replace(/\s/g, '');
+    const recipient = cleanMobile.replace(/^\+/, '');
+
+    console.log(`📱 Sending WhatsApp message to ${recipient}`);
+
+    const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_PHONE_NUMBER_ID}/messages`;
+
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient,
+      type: 'text',
+      text: {
+        body: message
+      }
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Authorization': `Bearer ${META_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`✅ WhatsApp message accepted by Meta for ${recipient}`);
+    return response.data;
+
   } catch (error) {
-    console.error('❌ Twilio API Error:', error.response?.data || error.message);
+    console.error('❌ Meta WhatsApp API Error:', error.response?.data || error.message);
     throw error;
   }
 }
 
 // ============================================
-// ENDPOINT 3: Health Check
+// WHATSAPP TEMPLATE SENDER – META CLOUD API
+// ============================================
+
+async function sendWhatsAppTemplate(mobile, templateName, variables, language = 'en_IN') {
+  try {
+    if (WHATSAPP_PROVIDER !== 'meta') {
+      throw new Error(`Unsupported WhatsApp provider: ${WHATSAPP_PROVIDER}`);
+    }
+
+    if (!META_PHONE_NUMBER_ID || !META_ACCESS_TOKEN || !META_GRAPH_VERSION) {
+      throw new Error('Meta WhatsApp credentials are not configured');
+    }
+
+    // Clean recipient number – remove + for Meta API
+    const cleanMobile = String(mobile).replace(/\s/g, '');
+    const recipient = cleanMobile.replace(/^\+/, '');
+
+    console.log(`📱 Sending template ${templateName} to ${recipient}`);
+
+    const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_PHONE_NUMBER_ID}/messages`;
+
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: {
+          code: language
+        },
+        components: [
+          {
+            type: 'body',
+            parameters: variables.map(v => ({
+              type: 'text',
+              text: v
+            }))
+          }
+        ]
+      }
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Authorization': `Bearer ${META_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`✅ Template accepted by Meta for ${recipient}`);
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ Meta Template Error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// ============================================
+// ENDPOINT 4: Health Check
 // GET /api/health
 // ============================================
 
@@ -233,7 +317,8 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'Festival Collection API is running!',
     razorpay_configured: !!(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
-    whatsapp_configured: !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_WHATSAPP_NUMBER),
+    meta_configured: !!(META_PHONE_NUMBER_ID && META_ACCESS_TOKEN && META_GRAPH_VERSION),
+    meta_graph_version: META_GRAPH_VERSION || 'Not Set',
     activeKeys: Object.keys(API_KEYS).length,
     timestamp: new Date().toISOString()
   });
@@ -246,6 +331,17 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`💳 Razorpay: ${RAZORPAY_KEY_ID ? '✅ Configured' : '❌ Not configured'}`);
-  console.log(`📱 WhatsApp: ${TWILIO_ACCOUNT_SID ? '✅ Configured' : '❌ Not configured'}`);
+  console.log(`📱 WhatsApp: ${
+    META_PHONE_NUMBER_ID && META_ACCESS_TOKEN && META_GRAPH_VERSION
+      ? '✅ Meta Configured'
+      : '❌ Meta Not Configured'
+  }`);
+  console.log(`📊 Graph API Version: ${META_GRAPH_VERSION || 'Not Set'}`);
   console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
 });
+
+// ============================================
+// EXPOSE FOR TESTING (Optional)
+// ============================================
+
+module.exports = app;
