@@ -177,15 +177,19 @@ app.post('/api/send-message', validateApiKey, async (req, res) => {
 
 async function sendWhatsAppMessage(mobile, message) {
   try {
+    console.log(`🔍 Starting WhatsApp send to: ${mobile}`);
+    console.log(`📝 Message: ${message.substring(0, 50)}...`);
     // Clean and format the recipient number
     const cleanMobile = mobile.replace(/\s/g, '');
     const finalMobile = cleanMobile.startsWith('+') ? cleanMobile : '+' + cleanMobile;
     const recipient = 'whatsapp:' + finalMobile;
 
-    console.log(`📱 Sending to ${recipient}`);
+    console.log(`📱 Formatted recipient: ${recipient}`);
+    console.log(`📱 From: ${TWILIO_WHATSAPP_NUMBER}`);
 
     // --- Twilio ---
     if (WHATSAPP_PROVIDER === 'twilio') {
+      console.log('🔍 Using Twilio provider');
       const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
       const auth = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
 
@@ -193,6 +197,8 @@ async function sendWhatsAppMessage(mobile, message) {
       params.append('To', recipient);
       params.append('From', TWILIO_WHATSAPP_NUMBER);
       params.append('Body', message);
+
+      console.log('🔍 Sending request to Twilio...');
 
       const response = await axios.post(url, params, {
         headers: {
