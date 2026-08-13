@@ -176,36 +176,44 @@ app.post('/api/send-message', validateApiKey, async (req, res) => {
 // ============================================
 
 async function sendWhatsAppMessage(mobile, message) {
-  // Clean mobile number
-  const cleanMobile = mobile.replace(/\s/g, '');
-  const finalMobile = cleanMobile.startsWith('+') ? cleanMobile : '+' + cleanMobile;
+  try {
+    // Clean and format the recipient number
+    const cleanMobile = mobile.replace(/\s/g, '');
+    const finalMobile = cleanMobile.startsWith('+') ? cleanMobile : '+' + cleanMobile;
+    const recipient = 'whatsapp:' + finalMobile;
 
-  // --- Twilio ---
-  if (WHATSAPP_PROVIDER === 'twilio') {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const auth = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
+    console.log(`📱 Sending to ${recipient}`);
 
-    const params = new URLSearchParams();
-    params.append('To', 'whatsapp:' + finalMobile);
-    params.append('From', TWILIO_WHATSAPP_NUMBER);
-    params.append('Body', message);
+    // --- Twilio ---
+    if (WHATSAPP_PROVIDER === 'twilio') {
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+      const auth = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
 
-    const response = await axios.post(url, params, {
-      headers: {
-        'Authorization': 'Basic ' + auth,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+      const params = new URLSearchParams();
+      params.append('To', recipient);
+      params.append('From', TWILIO_WHATSAPP_NUMBER);
+      params.append('Body', message);
 
-    console.log(`✅ WhatsApp sent to ${finalMobile}`);
-    return response.data;
-  }
+      const response = await axios.post(url, params, {
+        headers: {
+          'Authorization': 'Basic ' + auth,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
 
-  else {
-    console.log('⚠️ No WhatsApp provider configured. Message preview:');
-    console.log('To:', finalMobile);
-    console.log('Message:', message);
-    return { status: 'logged' };
+      console.log(`✅ WhatsApp sent to ${recipient}`);
+      return response.data;
+    }
+
+    else {
+      console.log('⚠️ No WhatsApp provider configured. Message preview:');
+      console.log('To:', recipient);
+      console.log('Message:', message);
+      return { status: 'logged' };
+    }
+  } catch (error) {
+    console.error('❌ Twilio API Error:', error.response?.data || error.message);
+    throw error;
   }
 }
 
