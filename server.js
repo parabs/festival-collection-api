@@ -176,7 +176,7 @@ app.post('/api/send-message', validateApiKey, async (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 3: Send WhatsApp Template (Production)
+// ENDPOINT: Send WhatsApp Template (Production)
 // POST /api/send-template
 // ============================================
 
@@ -185,17 +185,37 @@ app.post('/api/send-template', validateApiKey, async (req, res) => {
     const { mobile, templateName, variables, language } = req.body;
 
     if (!mobile || !templateName) {
-      return res.status(400).json({ error: 'Missing mobile or templateName' });
+      return res.status(400).json({
+        error: 'Missing mobile or templateName'
+      });
     }
 
     console.log(`📱 Sending template ${templateName} to ${mobile}`);
 
-    const result = await sendWhatsAppTemplate(mobile, templateName, variables || [], language || 'en_IN');
-    return res.json({ success: true, result });
+    const result = await sendWhatsAppTemplate(
+      mobile,
+      templateName,
+      variables || [],
+      language || 'en_IN'
+    );
+
+    return res.json({
+      success: true,
+      result
+    });
 
   } catch (error) {
-    console.error('❌ Send Template Error:', error.message);
-    return res.status(500).json({ error: 'Failed to send template' });
+    const metaError = error.response?.data || error.message;
+
+    console.error(
+      '❌ Send Template Error Details:',
+      JSON.stringify(metaError, null, 2)
+    );
+
+    return res.status(500).json({
+      error: 'Failed to send template',
+      details: metaError
+    });
   }
 });
 
