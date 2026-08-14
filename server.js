@@ -158,6 +158,10 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
 
 app.post('/api/send-message', validateApiKey, async (req, res) => {
   try {
+    const WHATSAPP_CONFIG = {
+      apiUrl: 'https://festival-collection-api.onrender.com/api/send-message',
+      apiKey: 'TEST_KEY_123'
+    };
     const { mobile, message } = req.body;
 
     if (!mobile || !message) {
