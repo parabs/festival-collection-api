@@ -11,7 +11,7 @@
     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden border-t-8 border-purple-600">
         
         <!-- Header Section -->
-        <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
+        <div class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
                 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
@@ -132,30 +132,15 @@
                     </button>
                 </div>
             </div>
+            <div id="formStatus" class="text-center text-sm font-medium hidden"></div>
+
         </form>
-
-        <!-- Success Confirmation View (Hidden by default) -->
-        <div id="successCard" class="hidden px-6 py-12 sm:px-8 text-center space-y-6">
-            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-3xl">
-                ✓
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900">Thank You for Your Contribution!</h2>
-            <p class="text-sm text-gray-600 max-w-md mx-auto">
-                Your support has been recorded successfully. A confirmation message and your receipt details have been processed.
-            </p>
-            <div id="receiptAction" class="pt-4">
-                <!-- Dynamic download or status message can be placed here -->
-                <button onclick="location.reload()" class="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg shadow hover:bg-purple-700 transition text-sm">
-                    Make Another Contribution
-                </button>
-            </div>
-        </div>
-
     </div>
 
-    <!-- Script to handle Dynamic Validation, Submission, and Success View -->
+    <!-- Script to handle Dynamic Validation & URL-encoded Form submission -->
     <script>
-        const scriptURL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+        // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbykO6OOQGNsJr4AZ9z6lGHQ06WX3YJDBJgbFKtOCdyGbHGd8fjncm5TT0dy28U0_ye1/exec';
 
         const autonomousRadios = document.querySelectorAll('input[name="autonomous"]');
         const donorNameInput = document.getElementById('donorName');
@@ -164,8 +149,7 @@
         const mobileAsterisk = document.getElementById('mobileAsterisk');
         const form = document.getElementById('contributionForm');
         const submitBtn = document.getElementById('submitBtn');
-        const formHeader = document.getElementById('formHeader');
-        const successCard = document.getElementById('successCard');
+        const formStatus = document.getElementById('formStatus');
 
         // Toggle required fields based on Anonymous selection
         autonomousRadios.forEach(radio => {
@@ -184,11 +168,12 @@
             });
         });
 
-        // Submit form data
+        // Submit form data using URLSearchParams and no-cors
         form.addEventListener('submit', e => {
             e.preventDefault();
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
+            formStatus.classList.add('hidden');
 
             const formData = {
                 formType: 'donation_form',
@@ -209,13 +194,21 @@
                 body: new URLSearchParams(formData).toString()
             })
             .then(() => {
-                // Hide form and header, show success confirmation card smoothly
-                form.classList.add('hidden');
-                formHeader.classList.add('hidden');
-                successCard.classList.remove('hidden');
+                formStatus.textContent = 'Thank you! Your contribution has been recorded successfully.';
+                formStatus.className = 'text-center text-sm font-medium text-green-600 mt-2';
+                formStatus.classList.remove('hidden');
+                form.reset();
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+                nameAsterisk.style.display = 'inline';
+                mobileAsterisk.style.display = 'inline';
+                donorNameInput.setAttribute('required', 'true');
+                mobileNoInput.setAttribute('required', 'true');
             })
             .catch(error => {
-                alert('Error submitting form. Please try again.');
+                formStatus.textContent = 'Error submitting form. Please try again.';
+                formStatus.className = 'text-center text-sm font-medium text-red-600 mt-2';
+                formStatus.classList.remove('hidden');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
             });
