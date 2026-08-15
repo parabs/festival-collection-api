@@ -29,6 +29,7 @@ const PORT = process.env.PORT || 3000;
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+const PAYMENT_CALLBACK_URL =  process.env.PAYMENT_CALLBACK_URL;
 
 if (!RAZORPAY_WEBHOOK_SECRET) {
   console.error('❌ Missing RAZORPAY_WEBHOOK_SECRET in environment!');
@@ -167,16 +168,27 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
       expire_by: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
       reference_id: donationId,
       description: `Contribution to ${req.mandalName}`,
+    
       customer: {
         name: name || 'Anonymous Supporter',
         contact: mobile.replace(/\s/g, '')
       },
-      notify: { sms: false, email: false, whatsapp: false },
+    
+      notify: {
+        sms: false,
+        email: false,
+        whatsapp: false
+      },
+    
       reminder_enable: false,
+    
       notes: {
         donation_id: donationId,
         mandal: req.mandalName
-      }
+      },
+    
+      callback_url: PAYMENT_CALLBACK_URL,
+      callback_method: 'get'
     };
 
     const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
@@ -389,6 +401,134 @@ app.post(
   }
 );
 
+// ============================================
+// ENDPOINT 3: Razorpay Payment Callback
+// GET /api/payment/callback
+// ============================================
+
+app.get('/api/payment/callback', async (req, res) => {
+
+  try {
+
+    const {
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_reference_id,
+      razorpay_payment_link_status,
+      razorpay_signature
+    } = req.query;
+
+    console.log(
+      '🔄 Razorpay payment callback received'
+    );
+
+    console.log(
+      `Donation ID: ${razorpay_payment_link_reference_id}`
+    );
+
+    console.log(
+      `Payment ID: ${razorpay_payment_id}`
+    );
+
+    console.log(
+      `Payment Link ID: ${razorpay_payment_link_id}`
+    );
+
+    console.log(
+      `Payment Link Status: ${razorpay_payment_link_status}`
+    );
+
+    // Temporary confirmation page
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1.0">
+
+        <title>Payment Confirmation</title>
+
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 40px 20px;
+            text-align: center;
+          }
+
+          .card {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+          }
+
+          h1 {
+            margin-bottom: 10px;
+          }
+
+          p {
+            color: #555;
+            line-height: 1.6;
+          }
+
+          .donation-id {
+            font-weight: bold;
+            margin: 20px 0;
+          }
+        </style>
+      </head>
+
+      <body>
+
+        <div class="card">
+
+          <h1>🙏 Payment Successful</h1>
+
+          <p>
+            Thank you for your generous contribution.
+          </p>
+
+          <p>
+            Your payment has been received successfully.
+          </p>
+
+          <div class="donation-id">
+            Donation ID:
+            ${razorpay_payment_link_reference_id || 'N/A'}
+          </div>
+
+          <p>
+            Your official donation receipt is being generated.
+          </p>
+
+          <p>
+            The receipt will also be sent to your WhatsApp
+            if a mobile number was provided.
+          </p>
+
+        </div>
+
+      </body>
+      </html>
+    `);
+
+  } catch (error) {
+
+    console.error(
+      '❌ Payment callback error:',
+      error.message
+    );
+
+    return res.status(500).send(
+      'Unable to process payment confirmation.'
+    );
+  }
+});
 
 // ============================================
 // ENDPOINT 2: Send WhatsApp Message (Text)
@@ -661,7 +801,129 @@ app.post('/api/webhook', (req, res) => {
   }
 });
 
+app.get('/payment-success', async (req, res) => {
 
+  try {
+
+    const {
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_reference_id,
+      razorpay_payment_link_status,
+      razorpay_signature
+    } = req.query;
+
+    console.log(
+      '🔄 Razorpay payment callback received'
+    );
+
+    console.log(
+      `Donation ID: ${razorpay_payment_link_reference_id}`
+    );
+
+    console.log(
+      `Payment ID: ${razorpay_payment_id}`
+    );
+
+    console.log(
+      `Payment Link ID: ${razorpay_payment_link_id}`
+    );
+
+    console.log(
+      `Payment Link Status: ${razorpay_payment_link_status}`
+    );
+
+    // Temporary confirmation page
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1.0">
+
+        <title>Payment Confirmation</title>
+
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 40px 20px;
+            text-align: center;
+          }
+
+          .card {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+          }
+
+          h1 {
+            margin-bottom: 10px;
+          }
+
+          p {
+            color: #555;
+            line-height: 1.6;
+          }
+
+          .donation-id {
+            font-weight: bold;
+            margin: 20px 0;
+          }
+        </style>
+      </head>
+
+      <body>
+
+        <div class="card">
+
+          <h1>🙏 Payment Successful</h1>
+
+          <p>
+            Thank you for your generous contribution.
+          </p>
+
+          <p>
+            Your payment has been received successfully.
+          </p>
+
+          <div class="donation-id">
+            Donation ID:
+            ${razorpay_payment_link_reference_id || 'N/A'}
+          </div>
+
+          <p>
+            Your official donation receipt is being generated.
+          </p>
+
+          <p>
+            The receipt will also be sent to your WhatsApp
+            if a mobile number was provided.
+          </p>
+
+        </div>
+
+      </body>
+      </html>
+    `);
+
+  } catch (error) {
+
+    console.error(
+      '❌ Payment callback error:',
+      error.message
+    );
+
+    return res.status(500).send(
+      'Unable to process payment confirmation.'
+    );
+  }
+});
 // ============================================
 // START SERVER
 // ============================================
