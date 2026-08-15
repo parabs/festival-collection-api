@@ -93,6 +93,53 @@ function validateApiKey(req, res, next) {
 }
 
 // ============================================
+// APPS SCRIPT PAYMENT BRIDGE
+// ============================================
+
+async function updatePaymentInAppsScript({
+  donationId,
+  paymentId,
+  paymentLinkId,
+  amount
+}) {
+  const appsScriptUrl =
+    process.env.APPS_SCRIPT_PAYMENT_URL;
+
+  const token =
+    process.env.APPS_SCRIPT_PAYMENT_TOKEN;
+
+  if (!appsScriptUrl || !token) {
+    throw new Error(
+      'Apps Script payment configuration is missing'
+    );
+  }
+
+  const response = await axios.post(
+    `${appsScriptUrl}?token=${encodeURIComponent(token)}`,
+    {
+      donationId,
+      paymentId,
+      paymentLinkId,
+      amount
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 15000
+    }
+  );
+
+  console.log(
+    '✅ Apps Script payment response:',
+    JSON.stringify(response.data)
+  );
+
+  return response.data;
+}
+
+
+// ============================================
 // ENDPOINT 1: Generate Razorpay Payment Link
 // POST /api/generate-link
 // ============================================
@@ -311,15 +358,23 @@ app.post(
       console.log(
         `Amount Paid: ${amountPaid}`
       );
-
-      // Temporary response for Step 4.8.1
-      // We are NOT updating Google Sheets yet.
+      
+      // Notify Apps Script to update the donation
+      const appsScriptResult =
+        await notifyAppsScriptPaymentPaid({
+          donationId,
+          paymentId,
+          paymentLinkId,
+          amount: amountPaid
+        });
+      
       return res.status(200).json({
         success: true,
         event: event.event,
-        donationId: donationId,
-        paymentLinkId: paymentLinkId,
-        paymentId: paymentId
+        donationId,
+        paymentLinkId,
+        paymentId,
+        appsScript: appsScriptResult
       });
 
     } catch (error) {
@@ -605,6 +660,7 @@ app.post('/api/webhook', (req, res) => {
     return res.sendStatus(200);
   }
 });
+
 
 // ============================================
 // START SERVER
