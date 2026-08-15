@@ -252,8 +252,15 @@
                 method: 'POST',
                 body: new URLSearchParams(formData)
             })
-            .then(response => response.json())
-            .then(result => {
+            .then(response => response.text()) // Get raw text first to inspect
+            .then(text => {
+                let result;
+                try {
+                    result = JSON.parse(text); // Try parsing as JSON
+                } catch (err) {
+                    throw new Error("Server returned HTML instead of JSON. Check Apps Script deployment permissions or logs.");
+                }
+
                 if (!result.success) {
                     throw new Error(result.error || 'Unable to process donation.');
                 }
