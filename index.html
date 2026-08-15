@@ -11,7 +11,7 @@
     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden border-t-8 border-purple-600">
         
         <!-- Header Section -->
-        <div class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
+        <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
                 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
@@ -106,17 +106,16 @@
                     </div>
                 </div>
 
-                <!-- Mode of Payment -->
+                <!-- Mode of Payment (Standardized) -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-900 mb-2">
                         Mode of Payment <span class="text-red-500">*</span>
                     </label>
                     <select name="paymentMode" required class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
                         <option value="">Choose payment mode</option>
-                        <option value="UPI">UPI / QR Code</option>
-                        <option value="Net Banking">Net Banking</option>
-                        <option value="Credit/Debit Card">Credit / Debit Card</option>
-                        <option value="Cash">Cash</option>
+                        <option value="Online Payment">Online Payment — UPI / Card / Net Banking</option>
+                        <option value="UPI">Direct UPI / QR Code</option>
+                        <option value="Cash">Cash Contribution</option>
                     </select>
                 </div>
             </div>
@@ -132,15 +131,54 @@
                     </button>
                 </div>
             </div>
-            <div id="formStatus" class="text-center text-sm font-medium hidden"></div>
-
         </form>
+
+        <!-- PAYMENT CONFIRMATION -->
+        <div id="confirmationPanel" class="hidden mt-6 px-6 pb-6 sm:px-8">
+            <div class="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+
+                <div id="confirmationIcon" class="text-4xl mb-3">
+                    ✓
+                </div>
+
+                <h2 id="confirmationTitle" class="text-xl font-bold text-gray-900">
+                    Thank You!
+                </h2>
+
+                <p id="confirmationMessage" class="mt-2 text-sm text-gray-600 leading-relaxed">
+                </p>
+
+                <!-- Contribution Summary -->
+                <div class="mt-5 bg-white rounded-lg border border-gray-200 p-4 text-left">
+                    <div class="flex justify-between py-1 text-sm">
+                        <span class="text-gray-500">Amount</span>
+                        <span id="confirmationAmount" class="font-semibold text-gray-900"></span>
+                    </div>
+                    <div class="flex justify-between py-1 text-sm">
+                        <span class="text-gray-500">Payment Mode</span>
+                        <span id="confirmationPaymentMode" class="font-semibold text-gray-900"></span>
+                    </div>
+                </div>
+
+                <!-- Online Payment Action -->
+                <div id="onlinePaymentAction" class="hidden mt-5">
+                    <button type="button" id="continuePaymentBtn" class="w-full px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow hover:bg-purple-700 transition">
+                        Proceed to Secure Payment →
+                    </button>
+                </div>
+
+                <button type="button" id="doneBtn" class="mt-4 text-sm font-medium text-purple-600 hover:text-purple-800">
+                    Done
+                </button>
+
+            </div>
+        </div>
+
     </div>
 
-    <!-- Script to handle Dynamic Validation & URL-encoded Form submission -->
+    <!-- Script to handle Dynamic Validation, Submission & Confirmation Screen -->
     <script>
-        // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbykO6OOQGNsJr4AZ9z6lGHQ06WX3YJDBJgbFKtOCdyGbHGd8fjncm5TT0dy28U0_ye1/exec';
+        const scriptURL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
 
         const autonomousRadios = document.querySelectorAll('input[name="autonomous"]');
         const donorNameInput = document.getElementById('donorName');
@@ -149,7 +187,16 @@
         const mobileAsterisk = document.getElementById('mobileAsterisk');
         const form = document.getElementById('contributionForm');
         const submitBtn = document.getElementById('submitBtn');
-        const formStatus = document.getElementById('formStatus');
+        const formHeader = document.getElementById('formHeader');
+
+        const confirmationPanel = document.getElementById('confirmationPanel');
+        const confirmationTitle = document.getElementById('confirmationTitle');
+        const confirmationMessage = document.getElementById('confirmationMessage');
+        const confirmationAmount = document.getElementById('confirmationAmount');
+        const confirmationPaymentMode = document.getElementById('confirmationPaymentMode');
+        const onlinePaymentAction = document.getElementById('onlinePaymentAction');
+        const continuePaymentBtn = document.getElementById('continuePaymentBtn');
+        const doneBtn = document.getElementById('doneBtn');
 
         // Toggle required fields based on Anonymous selection
         autonomousRadios.forEach(radio => {
@@ -168,21 +215,25 @@
             });
         });
 
-        // Submit form data using URLSearchParams and no-cors
+        // Submit form data
         form.addEventListener('submit', e => {
             e.preventDefault();
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
-            formStatus.classList.add('hidden');
+
+            const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
+            const otherAmountVal = document.getElementById('otherAmount').value;
+            const displayAmount = selectedAmountVal === 'other' ? '₹' + otherAmountVal : '₹' + selectedAmountVal;
+            const paymentMode = form.querySelector('select[name="paymentMode"]').value;
 
             const formData = {
                 formType: 'donation_form',
                 autonomous: form.querySelector('input[name="autonomous"]:checked').value,
                 donorName: donorNameInput.value,
                 mobileNo: mobileNoInput.value,
-                amount: form.querySelector('input[name="amount"]:checked').value,
-                otherAmount: document.getElementById('otherAmount').value,
-                paymentMode: form.querySelector('select[name="paymentMode"]').value
+                amount: selectedAmountVal,
+                otherAmount: otherAmountVal,
+                paymentMode: paymentMode
             };
 
             fetch(scriptURL, {
@@ -194,10 +245,54 @@
                 body: new URLSearchParams(formData).toString()
             })
             .then(() => {
-                formStatus.textContent = 'Thank you! Your contribution has been recorded successfully.';
-                formStatus.className = 'text-center text-sm font-medium text-green-600 mt-2';
-                formStatus.classList.remove('hidden');
-                form.reset();
+                // Populate confirmation summary details
+                confirmationAmount.textContent = displayAmount;
+                confirmationPaymentMode.textContent = paymentMode;
+
+                // Reset online action visibility
+                onlinePaymentAction.classList.add('hidden');
+
+                // ----------------------------------------
+                // CASH
+                // ----------------------------------------
+                if (paymentMode === 'Cash') {
+                    confirmationTitle.textContent = 'Thank You! 🙏';
+                    confirmationMessage.innerHTML = `
+                        Your cash contribution has been recorded successfully.
+                        <br><br>
+                        📄 Your receipt is being generated and will be sent to your WhatsApp if a mobile number was provided.
+                    `;
+                }
+                // ----------------------------------------
+                // DIRECT UPI
+                // ----------------------------------------
+                else if (paymentMode === 'UPI') {
+                    confirmationTitle.textContent = 'Thank You! 🙏';
+                    confirmationMessage.innerHTML = `
+                        Your contribution details have been recorded successfully.
+                        <br><br>
+                        ⏳ Please complete your UPI payment. Your receipt will be sent to your WhatsApp after payment verification.
+                    `;
+                }
+                // ----------------------------------------
+                // ONLINE PAYMENT
+                // ----------------------------------------
+                else if (paymentMode === 'Online Payment') {
+                    confirmationTitle.textContent = 'Thank You! 🙏';
+                    confirmationMessage.innerHTML = `
+                        Your contribution has been recorded successfully.
+                        <br><br>
+                        🔒 Please complete your secure online payment. Your receipt will be generated after successful payment confirmation and sent to your WhatsApp.
+                    `;
+                    onlinePaymentAction.classList.remove('hidden');
+                }
+
+                // Hide form header & form, show confirmation panel
+                formHeader.classList.add('hidden');
+                form.classList.add('hidden');
+                confirmationPanel.classList.remove('hidden');
+
+                // Restore form state internally
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
                 nameAsterisk.style.display = 'inline';
@@ -206,12 +301,23 @@
                 mobileNoInput.setAttribute('required', 'true');
             })
             .catch(error => {
-                formStatus.textContent = 'Error submitting form. Please try again.';
-                formStatus.className = 'text-center text-sm font-medium text-red-600 mt-2';
-                formStatus.classList.remove('hidden');
+                alert('Error submitting form. Please try again.');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
             });
+        });
+
+        // Done button behavior
+        doneBtn.addEventListener('click', () => {
+            confirmationPanel.classList.add('hidden');
+            form.reset();
+            form.classList.remove('hidden');
+            formHeader.classList.remove('hidden');
+
+            nameAsterisk.style.display = 'inline';
+            mobileAsterisk.style.display = 'inline';
+            donorNameInput.setAttribute('required', 'true');
+            mobileNoInput.setAttribute('required', 'true');
         });
     </script>
 </body>
