@@ -361,7 +361,7 @@ app.post(
       
       // Notify Apps Script to update the donation
       const appsScriptResult =
-        await notifyAppsScriptPaymentPaid({
+        await updatePaymentInAppsScript({
           donationId,
           paymentId,
           paymentLinkId,
