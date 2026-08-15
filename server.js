@@ -6,11 +6,18 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    if (req.originalUrl === '/api/razorpay/webhook') {
+      req.rawBody = buf;
+    }
+  }
+}));
 
 const PORT = process.env.PORT || 3000;
 
@@ -21,6 +28,11 @@ const PORT = process.env.PORT || 3000;
 // Razorpay
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+if (!RAZORPAY_WEBHOOK_SECRET) {
+  console.error('❌ Missing RAZORPAY_WEBHOOK_SECRET in environment!');
+}
 
 // WhatsApp - Meta Cloud API
 const WHATSAPP_PROVIDER = process.env.WHATSAPP_PROVIDER || 'meta';
@@ -150,6 +162,178 @@ app.post('/api/generate-link', validateApiKey, async (req, res) => {
     });
   }
 });
+
+// ============================================
+// ENDPOINT 2: Razorpay Payment Link Webhook
+// POST /api/razorpay/webhook
+// ============================================
+
+app.post(
+  '/api/razorpay/webhook',
+  async (req, res) => {
+
+    try {
+
+      const receivedSignature =
+        req.headers['x-razorpay-signature'];
+
+      if (!receivedSignature) {
+        console.error(
+          '❌ Razorpay webhook signature missing'
+        );
+
+        return res.sendStatus(400);
+      }
+
+      if (!RAZORPAY_WEBHOOK_SECRET) {
+        console.error(
+          '❌ RAZORPAY_WEBHOOK_SECRET is not configured'
+        );
+
+        return res.sendStatus(500);
+      }
+
+      // Raw request body captured by express.json verify()
+      const rawBody = req.rawBody;
+
+      if (!rawBody) {
+        console.error(
+          '❌ Razorpay webhook raw body unavailable'
+        );
+
+        return res.sendStatus(400);
+      }
+
+      // Generate expected signature
+      const expectedSignature =
+        crypto
+          .createHmac(
+            'sha256',
+            RAZORPAY_WEBHOOK_SECRET
+          )
+          .update(rawBody)
+          .digest('hex');
+
+      // Timing-safe comparison
+      const signaturesMatch =
+        receivedSignature.length === expectedSignature.length &&
+        crypto.timingSafeEqual(
+          Buffer.from(receivedSignature),
+          Buffer.from(expectedSignature)
+        );
+
+      if (!signaturesMatch) {
+        console.error(
+          '❌ Razorpay webhook signature verification failed'
+        );
+
+        return res.sendStatus(400);
+      }
+
+      console.log(
+        '✅ Razorpay webhook signature verified'
+      );
+
+      const event = req.body;
+
+      console.log(
+        '📩 Razorpay webhook event:',
+        event.event
+      );
+
+      // We currently process only successful Payment Link events
+      if (event.event !== 'payment_link.paid') {
+
+        console.log(
+          `ℹ️ Ignoring Razorpay event: ${event.event}`
+        );
+
+        return res.sendStatus(200);
+      }
+
+      const paymentLink =
+        event.payload?.payment_link?.entity;
+
+      const payment =
+        event.payload?.payment?.entity;
+
+      const order =
+        event.payload?.order?.entity;
+
+      if (!paymentLink) {
+
+        console.error(
+          '❌ payment_link entity missing from webhook'
+        );
+
+        return res.sendStatus(400);
+      }
+
+      // Donation ID was stored as reference_id
+      const donationId =
+        paymentLink.reference_id ||
+        paymentLink.notes?.donation_id;
+
+      if (!donationId) {
+
+        console.error(
+          '❌ Donation ID not found in Razorpay Payment Link'
+        );
+
+        return res.sendStatus(400);
+      }
+
+      const paymentId =
+        payment?.id || '';
+
+      const paymentLinkId =
+        paymentLink.id || '';
+
+      const amountPaid =
+        paymentLink.amount_paid || 0;
+
+      console.log(
+        `💳 Razorpay payment received`
+      );
+
+      console.log(
+        `Donation ID: ${donationId}`
+      );
+
+      console.log(
+        `Payment Link ID: ${paymentLinkId}`
+      );
+
+      console.log(
+        `Payment ID: ${paymentId}`
+      );
+
+      console.log(
+        `Amount Paid: ${amountPaid}`
+      );
+
+      // Temporary response for Step 4.8.1
+      // We are NOT updating Google Sheets yet.
+      return res.status(200).json({
+        success: true,
+        event: event.event,
+        donationId: donationId,
+        paymentLinkId: paymentLinkId,
+        paymentId: paymentId
+      });
+
+    } catch (error) {
+
+      console.error(
+        '❌ Razorpay webhook error:',
+        error.message
+      );
+
+      return res.sendStatus(500);
+    }
+  }
+);
+
 
 // ============================================
 // ENDPOINT 2: Send WhatsApp Message (Text)
