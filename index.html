@@ -14,7 +14,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v 1 -Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -319,26 +319,15 @@
             // Convert Drive view link to export/download link
             let downloadUrl = currentReceiptUrl.replace('/view?usp=drivesdk', '/export?exportFormat=pdf');
 
-            // Fetch PDF as blob and trigger download locally
-            fetch(downloadUrl)
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    downloadReceiptBtn.textContent = 'Download Receipt ↓';
-                })
-                .catch(err => {
-                    // Fallback to direct window open if blob fetch fails due to CORS
-                    window.open(downloadUrl, '_blank');
-                    downloadReceiptBtn.textContent = 'Download Receipt ↓';
-                });
-        });
+            // Trigger direct download via a temporary anchor element
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            
+          });
 
         // Raise Another Donation behavior
         newDonationBtn.addEventListener('click', () => {
