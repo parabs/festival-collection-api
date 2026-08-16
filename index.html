@@ -14,6 +14,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
+                v-1 
                 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
@@ -280,47 +281,47 @@
                 onlinePaymentAction.classList.add('hidden');
 
                 // ----------------------------------------
-                // CASH
+                // CONSOLIDATED CONFIRMATION LOGIC
                 // ----------------------------------------
-                if (paymentMode === 'Cash') {
+                
+                // If we have a receipt, the contribution is successful and ready.
+                if (receiptUrl) {
                     confirmationTitle.textContent = 'Contribution Successful ✓';
                     confirmationMessage.innerHTML = `
                         Thank you for your contribution.
                         <br><br>
-                        📄 Your receipt has been generated and sent to your WhatsApp if a mobile number was provided.
+                        ✅ Your payment is confirmed and your receipt is ready.
                     `;
 
-                    if (receiptUrl) {
-                        viewReceiptBtn.href = receiptUrl;
-                        receiptAction.classList.remove('hidden');
+                    // Generate Direct Download URL
+                    let downloadUrl = receiptUrl.replace('/view?usp=drivesdk', '/export?exportFormat=pdf');
+                    viewReceiptBtn.href = downloadUrl;
+                    receiptAction.classList.remove('hidden');
+                } 
+                // If no receipt yet, it's pending verification or payment.
+                else {
+                    confirmationTitle.textContent = 'Contribution Recorded ✓';
+                    
+                    if (paymentMode === 'Online Payment') {
+                        confirmationMessage.innerHTML = `
+                            Thank you for your contribution.
+                            <br><br>
+                            🔒 Please complete your secure online payment.
+                            <br><br>
+                            Your receipt will be generated after successful payment confirmation.
+                        `;
+                        onlinePaymentAction.classList.remove('hidden');
+                    } else if (paymentMode === 'UPI') {
+                        confirmationMessage.innerHTML = `
+                            Thank you for your contribution.
+                            <br><br>
+                            ⏳ Your UPI payment will be verified.
+                            <br><br>
+                            Your receipt will be generated and sent to your WhatsApp after confirmation.
+                        `;
+                    } else {
+                        confirmationMessage.innerHTML = `Thank you for your contribution.`;
                     }
-                }
-                // ----------------------------------------
-                // DIRECT UPI
-                // ----------------------------------------
-                else if (paymentMode === 'UPI') {
-                    confirmationTitle.textContent = 'Contribution Recorded ✓';
-                    confirmationMessage.innerHTML = `
-                        Thank you for your contribution.
-                        <br><br>
-                        ⏳ Your UPI payment will be verified.
-                        <br><br>
-                        Your receipt will be generated and sent to your WhatsApp after confirmation.
-                    `;
-                }
-                // ----------------------------------------
-                // ONLINE PAYMENT
-                // ----------------------------------------
-                else if (paymentMode === 'Online Payment') {
-                    confirmationTitle.textContent = 'Contribution Recorded ✓';
-                    confirmationMessage.innerHTML = `
-                        Thank you for your contribution.
-                        <br><br>
-                        🔒 Please complete your secure online payment.
-                        <br><br>
-                        Your receipt will be generated after successful payment confirmation.
-                    `;
-                    onlinePaymentAction.classList.remove('hidden');
                 }
 
                 // Hide form header & form, show confirmation panel
@@ -336,6 +337,7 @@
                 donorNameInput.setAttribute('required', 'true');
                 mobileNoInput.setAttribute('required', 'true');
             })
+                
             .catch(error => {
                 alert('Error submitting form: ' + error.message);
                 submitBtn.disabled = false;
