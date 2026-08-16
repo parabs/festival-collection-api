@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -277,7 +277,8 @@
 
         // Razorpay Checkout Integration
         // Render API Integration for Online Payment
-        function openRazorpayCheckout(amountInRupees) {
+// Render API Integration for Online Payment
+        function openRazorpayCheckout(amountInRupees, mobileNumber) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
                 alert('Please select a valid donation amount.');
@@ -286,15 +287,16 @@
                 return;
             }
 
-            // Generate a temporary donation ID or let your backend handle it
             const tempDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
 
             const payload = {
                 apiKey: "TEST_KEY_123", // Matches your successful PowerShell test key
                 donationId: tempDonationId,
-                mobile: mobileNoInput.value || "9999999999",
+                mobile: mobileNumber,
                 amount: numericAmount
             };
+
+            console.log("Sending request to Render API:", payload);
 
             // Call your Render backend endpoint
             fetch("https://festival-collection-api.onrender.com/api/generate-link", {
@@ -306,33 +308,25 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error("Failed to generate payment link from server.");
+                    throw new Error("Server responded with status " + response.status);
                 }
                 return response.json();
             })
             .then(data => {
                 console.log("Render API Response:", data);
                 
-                // If your backend returns a payment URL, redirect the user to it
-                if (data.paymentUrl || data.url) {
-                    window.location.href = data.paymentUrl || data.url;
+                // Check if your backend returned a payment link/URL
+                const paymentUrl = data.paymentUrl || data.url || (data.data && data.data.short_url);
+
+                if (paymentUrl) {
+                    // Redirect user to Razorpay payment page
+                    window.location.href = paymentUrl;
                 } else {
-                    // Fallback: If it directly logs to Google Sheets upon link generation request
-                    const formData = {
-                        formType: 'donation_form',
-                        autonomous: form.querySelector('input[name="autonomous"]:checked').value,
-                        donorName: donorNameInput.value,
-                        mobileNo: mobileNoInput.value,
-                        amount: amountInRupees,
-                        otherAmount: document.getElementById('otherAmount').value,
-                        paymentMode: 'Online Payment',
-                        paymentStatus: 'Paid',
-                        paymentReference: data.paymentId || tempDonationId
-                    };
-                    sendDataToGoogleSheets(formData);
+                    throw new Error("API response did not contain a valid payment URL.");
                 }
             })
             .catch(error => {
+                console.error("Payment Gateway Error:", error);
                 alert('Error connecting to payment gateway: ' + error.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
