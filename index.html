@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -189,7 +189,7 @@
 
     </div>
 
-    <!-- Script to handle Dynamic Validation, JSON Response & Confirmation Screen -->
+<!-- Script to handle Dynamic Validation, JSON Response & Confirmation Screen -->
     <script>
         const scriptURL = 'https://script.google.com/macros/s/AKfycbykO6OOQGNsJr4AZ9z6lGHQ06WX3YJDBJgbFKtOCdyGbHGd8fjncm5TT0dy28U0_ye1/exec';
 
@@ -211,33 +211,63 @@
         const receiptAction = document.getElementById('receiptAction');
         const downloadReceiptBtn = document.getElementById('downloadReceiptBtn');
         const onlinePaymentAction = document.getElementById('onlinePaymentAction');
-        const continuePaymentBtn = document.getElementById('continuePaymentBtn');
         const newDonationBtn = document.getElementById('newDonationBtn');
 
         let currentReceiptUrl = '';
 
-// Check if user just returned from Razorpay redirect
+        // Check if user just returned from Razorpay redirect
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const paymentStatus = urlParams.get('razorpay_payment_link_status');
             const paymentId = urlParams.get('razorpay_payment_id');
             const returnedAmount = urlParams.get('amount');
+            const returnedMobile = urlParams.get('mobile');
 
             if (paymentStatus === 'paid' || paymentId || returnedAmount) {
                 formHeader.classList.add('hidden');
                 form.classList.add('hidden');
                 confirmationPanel.classList.remove('hidden');
 
+                const finalDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-ONLINE";
+                
                 confirmationTitle.textContent = 'Contribution Successful ✓';
                 confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Payment verified via Razorpay. Your receipt is ready for download.`;
-                confirmationDonationId.textContent = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-ONLINE";
-                
-                // Display the correct amount passed back through the query string
+                confirmationDonationId.textContent = finalDonationId;
                 confirmationAmount.textContent = returnedAmount ? `₹${returnedAmount}` : "Verified";
                 confirmationPaymentMode.textContent = "Online Payment";
                 
-                // Set a mock receipt download or trigger backend logging if needed
                 receiptAction.classList.remove('hidden');
+
+                // Send the verified online payment record ONCE to Google Sheets
+                const verifiedData = {
+                    formType: 'donation_form',
+                    autonomous: 'no',
+                    donorName: donorNameInput.value || 'Online Supporter',
+                    mobileNo: returnedMobile || '9876543210',
+                    amount: returnedAmount || '101',
+                    otherAmount: '',
+                    paymentMode: 'Online Payment',
+                    paymentStatus: 'Paid',
+                    paymentReference: paymentId || 'Razorpay Link'
+                };
+
+                // Prevent duplicate firing by cleaning URL parameters instantly
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Log to Google Sheets silently
+                fetch(scriptURL, {
+                    method: 'POST',
+                    body: new URLSearchParams(verifiedData)
+                })
+                .then(res => res.text())
+                .then(txt => {
+                    try {
+                        let resJson = JSON.parse(txt);
+                        if (resJson.receiptUrl) {
+                            currentReceiptUrl = resJson.receiptUrl;
+                        }
+                    } catch(e) {}
+                }).catch(err => console.error("Sheets sync error:", err));
             }
         });
 
@@ -296,7 +326,7 @@
             sendDataToGoogleSheets(formData);
         });
 
-// Render API Integration for Online Payment
+        // Render API Integration for Online Payment
         function openRazorpayCheckout(amountInRupees, mobileNumber) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -308,7 +338,7 @@
 
             const tempDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
 
-            // Dynamically include amount and mobile in the return URL so GitHub Pages can read them on return
+            // Pass amount and mobile back in query parameters so return handler catches them accurately
             const baseRedirectUrl = window.location.origin + window.location.pathname;
             const customCallbackUrl = `${baseRedirectUrl}?amount=${numericAmount}&mobile=${encodeURIComponent(mobileNumber)}`;
 
@@ -317,7 +347,7 @@
                 donationId: tempDonationId,
                 mobile: mobileNumber,
                 amount: numericAmount,
-                callback_url: customCallbackUrl // Passing it explicitly
+                callback_url: customCallbackUrl
             };
 
             fetch("https://festival-collection-api.onrender.com/api/generate-link", {
@@ -386,9 +416,6 @@
                 } else {
                     confirmationTitle.textContent = 'Contribution Recorded ✓';
                     confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>⏳ Your payment is being verified.`;
-                    if (paymentMode === 'Online Payment') {
-                        onlinePaymentAction.classList.remove('hidden');
-                    }
                 }
 
                 formHeader.classList.add('hidden');
