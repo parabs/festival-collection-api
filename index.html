@@ -243,6 +243,9 @@
             const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
             const otherAmountVal = document.getElementById('otherAmount').value;
             const paymentMode = form.querySelector('select[name="paymentMode"]').value;
+            const isAnonymous = form.querySelector('input[name="autonomous"]:checked').value === 'yes';
+            
+            // Single declaration of finalAmount
             const finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
 
             // Get mobile number or provide a safe default if anonymous for payment gateways
@@ -250,10 +253,10 @@
             if (isAnonymous && (!mobileNumber || mobileNumber.length < 10)) {
                 // Razorpay requires a valid 10-digit format. 
                 // You can either prompt them or use a placeholder/admin fallback for anonymous online tracking:
-                mobileNumber = "9876543210"; 
+                mobileNumber = "9892805337"; 
             }
 
-            const finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
+            finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
             
             // 1. IF ONLINE PAYMENT: Open Razorpay first (Does not touch your cash logic)
             if (paymentMode === 'Online Payment') {
