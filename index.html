@@ -270,14 +270,21 @@
 
         // Razorpay Checkout Integration
         function openRazorpayCheckout(amountInRupees) {
+            const numericAmount = parseFloat(amountInRupees);
+            if (isNaN(numericAmount) || numericAmount <= 0) {
+                alert('Please select a valid donation amount.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+                return;
+            }
+
             const options = {
-                "key": "YOUR_RAZORPAY_KEY_ID", // Replace with your key
-                "amount": amountInRupees * 100, // Amount in paise
+                "key": "rzp_test_YOUR_ACTUAL_KEY_HERE", // <-- Put your real Razorpay Test/Live Key here
+                "amount": Math.round(numericAmount * 100), // Amount in paise (must be an integer)
                 "currency": "INR",
                 "name": "Community Support",
                 "description": "Festival Contribution",
                 "handler": function (response) {
-                    // When Razorpay succeeds, we build the same form data payload, but mark it 'Paid' + reference ID
                     const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
                     const otherAmountVal = document.getElementById('otherAmount').value;
 
@@ -293,7 +300,6 @@
                         paymentReference: response.razorpay_payment_id
                     };
 
-                    // Sends verified online payment to your exact same Google Sheets handler
                     sendDataToGoogleSheets(formData);
                 },
                 "prefill": {
@@ -310,8 +316,15 @@
                     }
                 }
             };
-            const rzp = new Razorpay(options);
-            rzp.open();
+            
+            try {
+                const rzp = new Razorpay(options);
+                rzp.open();
+            } catch (err) {
+                alert('Razorpay failed to load: ' + err.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+            }
         }
 
         // YOUR EXACT FETCH AND UI HANDLING CODE (Wrapped in a reusable function)
