@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -275,8 +275,7 @@
             sendDataToGoogleSheets(formData);
         });
 
-
-        // Render API Integration for Online Payment
+// Render API Integration for Online Payment
         function openRazorpayCheckout(amountInRupees, mobileNumber) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -309,19 +308,19 @@
                 if (!response.ok) {
                     throw new Error("Server responded with status " + response.status);
                 }
-                return response.text();
+                return response.json(); // Parse response as JSON object
             })
-            .then(paymentUrl => {
-                console.log("Render API Response Text:", paymentUrl);
+            .then(data => {
+                console.log("Render API JSON Response:", data);
                 
-                // Clean up any extra quotes or whitespace from the returned string
-                const cleanUrl = paymentUrl ? paymentUrl.trim().replace(/^["']|["']$/g, '') : '';
+                // Extract payment link from the JSON response object
+                const paymentUrl = data.payment_link || data.url || data.link || data.short_url;
 
-                if (cleanUrl.startsWith('http')) {
-                    // Redirect directly to the generated Razorpay link
-                    window.location.href = cleanUrl;
+                if (paymentUrl && paymentUrl.startsWith('http')) {
+                    // Redirect directly to the Razorpay payment link
+                    window.location.href = paymentUrl;
                 } else {
-                    throw new Error("Received invalid URL from server: " + paymentUrl);
+                    throw new Error("API response did not contain a valid payment link property.");
                 }
             })
             .catch(error => {
