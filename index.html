@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -242,42 +242,36 @@
 
             const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
             const otherAmountVal = document.getElementById('otherAmount').value;
-            const paymentMode = form.querySelector('select[name="paymentMode"]').value;
+            let paymentModeVal = form.querySelector('select[name="paymentMode"]').value; // Using 'let' to prevent assignment errors
             const isAnonymous = form.querySelector('input[name="autonomous"]:checked').value === 'yes';
             
-            // Single declaration of finalAmount
             const finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
 
-            // Get mobile number or provide a safe default if anonymous for payment gateways
+            // Handle mobile number validation safely for online payments
             let mobileNumber = mobileNoInput.value.trim();
-            if (isAnonymous && (!mobileNumber || mobileNumber.length < 10)) {
-                // Razorpay requires a valid 10-digit format. 
-                // You can either prompt them or use a placeholder/admin fallback for anonymous online tracking:
-                mobileNumber = "9892805337"; 
+            if (paymentModeVal === 'Online Payment' && isAnonymous && (!mobileNumber || mobileNumber.length < 10)) {
+                mobileNumber = "9876543210"; // Fallback for Razorpay/Render gateway requirement
             }
 
-            finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
-            
-            // 1. IF ONLINE PAYMENT: Open Razorpay first (Does not touch your cash logic)
-            if (paymentMode === 'Online Payment') {
-                openRazorpayCheckout(finalAmount);
+            // 1. IF ONLINE PAYMENT: Open Razorpay via Render API
+            if (paymentModeVal === 'Online Payment') {
+                openRazorpayCheckout(finalAmount, mobileNumber);
                 return;
             }
 
-            // 2. FOR CASH OR UPI: Uses your exact form data payload structure
+            // 2. FOR CASH OR UPI: Regular Flow
             const formData = {
                 formType: 'donation_form',
-                autonomous: form.querySelector('input[name="autonomous"]:checked').value,
-                donorName: donorNameInput.value,
+                autonomous: isAnonymous ? 'yes' : 'no',
+                donorName: isAnonymous ? 'Anonymous' : donorNameInput.value,
                 mobileNo: mobileNoInput.value,
                 amount: selectedAmountVal,
                 otherAmount: otherAmountVal,
-                paymentMode: paymentMode,
-                paymentStatus: paymentMode === 'Cash' ? 'Paid' : 'Pending',
+                paymentMode: paymentModeVal,
+                paymentStatus: paymentModeVal === 'Cash' ? 'Paid' : 'Pending',
                 paymentReference: ''
             };
 
-            // Calls the exact fetch & UI handling code you pasted above
             sendDataToGoogleSheets(formData);
         });
 
