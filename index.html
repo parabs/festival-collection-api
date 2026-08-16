@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -216,6 +216,27 @@
 
         let currentReceiptUrl = '';
 
+        // Check if user just returned from Razorpay redirect
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('razorpay_payment_link_status');
+            const paymentId = urlParams.get('razorpay_payment_id');
+
+            if (paymentStatus === 'paid' || paymentId) {
+                formHeader.classList.add('hidden');
+                form.classList.add('hidden');
+                confirmationPanel.classList.remove('hidden');
+
+                confirmationTitle.textContent = 'Contribution Successful ✓';
+                confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Payment verified via Razorpay. Your receipt is ready for download.`;
+                confirmationDonationId.textContent = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-ONLINE";
+                confirmationAmount.textContent = "Verified";
+                confirmationPaymentMode.textContent = "Online Payment";
+                
+                receiptAction.classList.remove('hidden');
+            }
+        });
+
         // Toggle required fields based on Anonymous selection
         autonomousRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
@@ -234,7 +255,6 @@
         });
 
         // Submit form data
-        // Submit form data
         form.addEventListener('submit', e => {
             e.preventDefault();
             submitBtn.disabled = true;
@@ -242,24 +262,21 @@
 
             const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
             const otherAmountVal = document.getElementById('otherAmount').value;
-            let paymentModeVal = form.querySelector('select[name="paymentMode"]').value; // Using 'let' to prevent assignment errors
+            let paymentModeVal = form.querySelector('select[name="paymentMode"]').value;
             const isAnonymous = form.querySelector('input[name="autonomous"]:checked').value === 'yes';
             
             const finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
 
-            // Handle mobile number validation safely for online payments
             let mobileNumber = mobileNoInput.value.trim();
             if (paymentModeVal === 'Online Payment' && isAnonymous && (!mobileNumber || mobileNumber.length < 10)) {
-                mobileNumber = "9876543210"; // Fallback for Razorpay/Render gateway requirement
+                mobileNumber = "9876543210"; 
             }
 
-            // 1. IF ONLINE PAYMENT: Open Razorpay via Render API
             if (paymentModeVal === 'Online Payment') {
                 openRazorpayCheckout(finalAmount, mobileNumber);
                 return;
             }
 
-            // 2. FOR CASH OR UPI: Regular Flow
             const formData = {
                 formType: 'donation_form',
                 autonomous: isAnonymous ? 'yes' : 'no',
@@ -275,7 +292,7 @@
             sendDataToGoogleSheets(formData);
         });
 
-// Render API Integration for Online Payment
+        // Render API Integration for Online Payment
         function openRazorpayCheckout(amountInRupees, mobileNumber) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -294,9 +311,6 @@
                 amount: numericAmount
             };
 
-            console.log("Sending request to Render API:", payload);
-
-            // Call your Render backend endpoint
             fetch("https://festival-collection-api.onrender.com/api/generate-link", {
                 method: "POST",
                 headers: {
@@ -308,16 +322,12 @@
                 if (!response.ok) {
                     throw new Error("Server responded with status " + response.status);
                 }
-                return response.json(); // Parse response as JSON object
+                return response.json();
             })
             .then(data => {
-                console.log("Render API JSON Response:", data);
-                
-                // Extract payment link from the JSON response object
                 const paymentUrl = data.payment_link || data.url || data.link || data.short_url;
 
                 if (paymentUrl && paymentUrl.startsWith('http')) {
-                    // Redirect directly to the Razorpay payment link
                     window.location.href = paymentUrl;
                 } else {
                     throw new Error("API response did not contain a valid payment link property.");
@@ -331,20 +341,13 @@
             });
         }
         
-        // YOUR EXACT FETCH AND UI HANDLING CODE (Wrapped in a reusable function)
         function sendDataToGoogleSheets(formData) {
-            console.log("Submitting form data to Apps Script:", formData);
-
             fetch(scriptURL, {
                 method: 'POST',
                 body: new URLSearchParams(formData)
             })
-            .then(response => {
-                console.log("Raw response received from Apps Script:", response);
-                return response.text();
-            })
+            .then(response => response.text())
             .then(text => {
-                console.log("Raw response text:", text);
                 let result;
                 try {
                     result = JSON.parse(text);
@@ -360,12 +363,10 @@
                 const donationId = result.donationId;
                 currentReceiptUrl = result.receiptUrl || '';
 
-                // Populate confirmation details
                 confirmationDonationId.textContent = donationId;
                 confirmationAmount.textContent = result.amount;
                 confirmationPaymentMode.textContent = paymentMode;
 
-                // Reset action visibility
                 receiptAction.classList.add('hidden');
                 onlinePaymentAction.classList.add('hidden');
 
@@ -387,33 +388,23 @@
 
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
-                nameAsterisk.style.display = 'inline';
-                mobileAsterisk.style.display = 'inline';
-                donorNameInput.setAttribute('required', 'true');
-                mobileNoInput.setAttribute('required', 'true');
             })
             .catch(error => {
-                console.error("Submission Catch Error:", error);
                 alert('Error submitting form: ' + error.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
             });
         }
 
-   // Direct Download Trigger via Correct Google Drive Export Endpoint
         downloadReceiptBtn.addEventListener('click', () => {
             if (!currentReceiptUrl) return;
 
-            // Extract the File ID from the standard Google Drive URL
-            // Example URL: https://drive.google.com/file/d/1tWPKCFBIB.../view?usp=drivesdk
             const match = currentReceiptUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
             
             if (match && match[1]) {
                 const fileId = match[1];
-                // Use the official Google Drive direct download / export URL structure
                 let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-                // Trigger direct download via a temporary anchor element
                 const a = document.createElement('a');
                 a.href = downloadUrl;
                 a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
@@ -421,12 +412,10 @@
                 a.click();
                 a.remove();
             } else {
-                // Fallback to opening the original link if ID extraction fails
                 window.open(currentReceiptUrl, '_blank');
             }
         });
 
-        // Raise Another Donation behavior
         newDonationBtn.addEventListener('click', () => {
             confirmationPanel.classList.add('hidden');
             form.reset();
