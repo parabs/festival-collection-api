@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -269,6 +269,7 @@
         });
 
         // Razorpay Checkout Integration
+// Render API Integration for Online Payment
         function openRazorpayCheckout(amountInRupees) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -278,53 +279,57 @@
                 return;
             }
 
-            const options = {
-                "key": "rzp_test_YOUR_ACTUAL_KEY_HERE", // <-- Put your real Razorpay Test/Live Key here
-                "amount": Math.round(numericAmount * 100), // Amount in paise (must be an integer)
-                "currency": "INR",
-                "name": "Community Support",
-                "description": "Festival Contribution",
-                "handler": function (response) {
-                    const selectedAmountVal = form.querySelector('input[name="amount"]:checked').value;
-                    const otherAmountVal = document.getElementById('otherAmount').value;
+            // Generate a temporary donation ID or let your backend handle it
+            const tempDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
 
+            const payload = {
+                apiKey: "TEST_KEY_123", // Matches your successful PowerShell test key
+                donationId: tempDonationId,
+                mobile: mobileNoInput.value || "9999999999",
+                amount: numericAmount
+            };
+
+            // Call your Render backend endpoint
+            fetch("https://festival-collection-api.onrender.com/api/generate-link", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Failed to generate payment link from server.");
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Render API Response:", data);
+                
+                // If your backend returns a payment URL, redirect the user to it
+                if (data.paymentUrl || data.url) {
+                    window.location.href = data.paymentUrl || data.url;
+                } else {
+                    // Fallback: If it directly logs to Google Sheets upon link generation request
                     const formData = {
                         formType: 'donation_form',
                         autonomous: form.querySelector('input[name="autonomous"]:checked').value,
                         donorName: donorNameInput.value,
                         mobileNo: mobileNoInput.value,
-                        amount: selectedAmountVal,
-                        otherAmount: otherAmountVal,
+                        amount: amountInRupees,
+                        otherAmount: document.getElementById('otherAmount').value,
                         paymentMode: 'Online Payment',
                         paymentStatus: 'Paid',
-                        paymentReference: response.razorpay_payment_id
+                        paymentReference: data.paymentId || tempDonationId
                     };
-
                     sendDataToGoogleSheets(formData);
-                },
-                "prefill": {
-                    "name": donorNameInput.value,
-                    "contact": mobileNoInput.value
-                },
-                "theme": {
-                    "color": "#7c3aed"
-                },
-                "modal": {
-                    "ondismiss": function() {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Submit';
-                    }
                 }
-            };
-            
-            try {
-                const rzp = new Razorpay(options);
-                rzp.open();
-            } catch (err) {
-                alert('Razorpay failed to load: ' + err.message);
+            })
+            .catch(error => {
+                alert('Error connecting to payment gateway: ' + error.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
-            }
+            });
         }
 
         // YOUR EXACT FETCH AND UI HANDLING CODE (Wrapped in a reusable function)
