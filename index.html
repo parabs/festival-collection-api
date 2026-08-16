@@ -14,7 +14,6 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v-2 
                 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
@@ -165,14 +164,11 @@
                     </div>
                 </div>
 
-                <!-- View Receipt Action -->
+                <!-- View/Download Receipt Action -->
                 <div id="receiptAction" class="hidden mt-5">
-                    <a id="viewReceiptBtn" 
-                       href="#" 
-                       download="Receipt.pdf" 
-                       class="block w-full px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow hover:bg-purple-700 transition text-center">
+                    <button type="button" id="downloadReceiptBtn" class="w-full px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow hover:bg-purple-700 transition">
                         Download Receipt ↓
-                    </a>
+                    </button>
                 </div>
 
                 <!-- Online Payment Action -->
@@ -211,10 +207,12 @@
         const confirmationAmount = document.getElementById('confirmationAmount');
         const confirmationPaymentMode = document.getElementById('confirmationPaymentMode');
         const receiptAction = document.getElementById('receiptAction');
-        const viewReceiptBtn = document.getElementById('viewReceiptBtn');
+        const downloadReceiptBtn = document.getElementById('downloadReceiptBtn');
         const onlinePaymentAction = document.getElementById('onlinePaymentAction');
         const continuePaymentBtn = document.getElementById('continuePaymentBtn');
         const newDonationBtn = document.getElementById('newDonationBtn');
+
+        let currentReceiptUrl = '';
 
         // Toggle required fields based on Anonymous selection
         autonomousRadios.forEach(radio => {
@@ -256,13 +254,13 @@
                 method: 'POST',
                 body: new URLSearchParams(formData)
             })
-            .then(response => response.text()) // Get raw text first to inspect
+            .then(response => response.text())
             .then(text => {
                 let result;
                 try {
-                    result = JSON.parse(text); // Try parsing as JSON
+                    result = JSON.parse(text);
                 } catch (err) {
-                    throw new Error("Server returned HTML instead of JSON. Check Apps Script deployment permissions or logs.");
+                    throw new Error("Server returned HTML instead of JSON. Check Apps Script deployment permissions.");
                 }
 
                 if (!result.success) {
@@ -271,7 +269,7 @@
 
                 const paymentMode = result.paymentMode;
                 const donationId = result.donationId;
-                const receiptUrl = result.receiptUrl || '';
+                currentReceiptUrl = result.receiptUrl || '';
 
                 // Populate confirmation details
                 confirmationDonationId.textContent = donationId;
@@ -280,61 +278,24 @@
 
                 // Reset action visibility
                 receiptAction.classList.add('hidden');
-                viewReceiptBtn.removeAttribute('href');
                 onlinePaymentAction.classList.add('hidden');
 
-                // ----------------------------------------
-                // CONSOLIDATED CONFIRMATION LOGIC
-                // ----------------------------------------
-                
-                // If we have a receipt, the contribution is successful and ready.
-                if (receiptUrl) {
+                if (currentReceiptUrl) {
                     confirmationTitle.textContent = 'Contribution Successful ✓';
-                    confirmationMessage.innerHTML = `
-                        Thank you for your contribution.
-                        <br><br>
-                        ✅ Your payment is confirmed and your receipt is ready.
-                    `;
-
-                    // Generate Direct Download URL
-                    let downloadUrl = receiptUrl.replace('/view?usp=drivesdk', '/export?exportFormat=pdf');
-                    viewReceiptBtn.href = downloadUrl;
-                    // Ensure the link is explicitly set for download
-                    viewReceiptBtn.setAttribute('download', 'Receipt.pdf');
+                    confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Your payment is confirmed and your receipt is ready for download.`;
                     receiptAction.classList.remove('hidden');
-                } 
-                // If no receipt yet, it's pending verification or payment.
-                else {
+                } else {
                     confirmationTitle.textContent = 'Contribution Recorded ✓';
-                    
+                    confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>⏳ Your payment is being verified.`;
                     if (paymentMode === 'Online Payment') {
-                        confirmationMessage.innerHTML = `
-                            Thank you for your contribution.
-                            <br><br>
-                            🔒 Please complete your secure online payment.
-                            <br><br>
-                            Your receipt will be generated after successful payment confirmation.
-                        `;
                         onlinePaymentAction.classList.remove('hidden');
-                    } else if (paymentMode === 'UPI') {
-                        confirmationMessage.innerHTML = `
-                            Thank you for your contribution.
-                            <br><br>
-                            ⏳ Your UPI payment will be verified.
-                            <br><br>
-                            Your receipt will be generated and sent to your WhatsApp after confirmation.
-                        `;
-                    } else {
-                        confirmationMessage.innerHTML = `Thank you for your contribution.`;
                     }
                 }
 
-                // Hide form header & form, show confirmation panel
                 formHeader.classList.add('hidden');
                 form.classList.add('hidden');
                 confirmationPanel.classList.remove('hidden');
 
-                // Restore submit button state
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
                 nameAsterisk.style.display = 'inline';
@@ -342,12 +303,41 @@
                 donorNameInput.setAttribute('required', 'true');
                 mobileNoInput.setAttribute('required', 'true');
             })
-                
             .catch(error => {
                 alert('Error submitting form: ' + error.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
             });
+        });
+
+        // Direct Download Trigger via JavaScript fetch blob (Bypasses Google Drive Preview)
+        downloadReceiptBtn.addEventListener('click', () => {
+            if (!currentReceiptUrl) return;
+
+            downloadReceiptBtn.textContent = 'Downloading...';
+            
+            // Convert Drive view link to export/download link
+            let downloadUrl = currentReceiptUrl.replace('/view?usp=drivesdk', '/export?exportFormat=pdf');
+
+            // Fetch PDF as blob and trigger download locally
+            fetch(downloadUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    downloadReceiptBtn.textContent = 'Download Receipt ↓';
+                })
+                .catch(err => {
+                    // Fallback to direct window open if blob fetch fails due to CORS
+                    window.open(downloadUrl, '_blank');
+                    downloadReceiptBtn.textContent = 'Download Receipt ↓';
+                });
         });
 
         // Raise Another Donation behavior
