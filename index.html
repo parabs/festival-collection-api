@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -312,29 +312,19 @@
                 }
                 return response.json();
             })
-            .then(data => {
-                console.log("Full Render API Response Object:", JSON.stringify(data, null, 2));
-                console.log("Render API Response:", data);
-
-                // Check all potential keys including nested ones
-                const paymentUrl = data.url || data.link || data.short_url || data.paymentUrl || (data.data && (data.data.short_url || data.data.url || data.data.link));
+           then(paymentUrl => {
+                console.log("Render API Response Text:", paymentUrl);
                 
-                // Check if your backend returned a payment link/URL
-                // const paymentUrl = data.paymentUrl || data.url || (data.data && data.data.short_url);
+                // Clean up any extra quotes or whitespace if present
+                const cleanUrl = paymentUrl ? paymentUrl.trim().replace(/^["']|["']$/g, '') : '';
 
-                if (paymentUrl) {
-                    // Redirect user to Razorpay payment page
-                    window.location.href = paymentUrl;
+                if (cleanUrl.startsWith('http')) {
+                    // Redirect directly to the Razorpay link
+                    window.location.href = cleanUrl;
                 } else {
-                    throw new Error("API response did not contain a valid payment URL.");
+                    throw new Error("Received invalid URL from server: " + paymentUrl);
                 }
             })
-            .catch(error => {
-                console.error("Payment Gateway Error:", error);
-                alert('Error connecting to payment gateway: ' + error.message);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit';
-            });
         }
 
         // YOUR EXACT FETCH AND UI HANDLING CODE (Wrapped in a reusable function)
