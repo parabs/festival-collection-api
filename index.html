@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -235,13 +235,9 @@
                     paymentReference: paymentId || 'Online Payment'
                 };
 
-                fetch(scriptURL, {
-                    method: 'POST',
-                    body: new URLSearchParams(updateData)
-                }).catch(err => console.error("Update sync error:", err));
-
-                localStorage.removeItem('pendingDonationId');
-                showConfirmationScreen("Online Payment Confirmed", "Online Payment");
+                // Wait for the server-side Razorpay webhook
+                // to confirm payment and generate the receipt.
+                checkOnlinePaymentStatus(savedDonationId);
             }
         });
         
@@ -327,29 +323,45 @@
                     );
                 }
         
-                // CASH or UPI
-                if (paymentMode === 'UPI' || paymentMode === 'Cash') {
-        
+                // CASH
+                if (paymentMode === 'Cash') {
+                
                     currentReceiptUrl =
                         result.receiptUrl || '';
-        
+                
                     showConfirmationScreen(
                         finalAmount,
-                        'Cash'
+                        'Cash',
+                        result.donationId
                     );
-        
+                
                     return;
                 }
-        
+                
+                // UPI
+                if (paymentMode === 'UPI') {
+                
+                    currentReceiptUrl =
+                        result.receiptUrl || '';
+                
+                    showConfirmationScreen(
+                        finalAmount,
+                        'UPI',
+                        result.donationId
+                    );
+                
+                    return;
+                }
+                
                 // ONLINE PAYMENT
                 if (paymentMode === 'Online Payment') {
-        
+                
                     openRazorpayCheckout(
                         finalAmount,
                         mobileNumber,
                         result.donationId
                     );
-        
+                
                     return;
                 }
         
@@ -407,16 +419,91 @@
                 submitBtn.textContent = 'Submit';
             });
         }
+
+        // Check server-side payment status and wait for receipt
+        function checkOnlinePaymentStatus(donationId) {
+        
+            fetch(
+                scriptURL +
+                '?action=get_donation&donationId=' +
+                encodeURIComponent(donationId)
+            )
+            .then(response => response.json())
+            .then(result => {
+        
+                console.log(
+                    'Payment status check:',
+                    result
+                );
+        
+                if (!result.success) {
+                    throw new Error(
+                        result.error ||
+                        'Unable to check payment status.'
+                    );
+                }
+        
+                // Payment confirmed AND receipt generated
+                if (
+                    result.paymentStatus === 'Paid' &&
+                    result.receiptUrl
+                ) {
+        
+                    currentReceiptUrl =
+                        result.receiptUrl;
+        
+                    localStorage.removeItem(
+                        'pendingDonationId'
+                    );
+        
+                    showConfirmationScreen(
+                        result.amount,
+                        'Online Payment',
+                        result.donationId
+                    );
+        
+                    return;
+                }
+        
+                // Payment may be confirmed but receipt
+                // generation is still in progress.
+                console.log(
+                    'Payment/receipt not ready yet. Retrying...'
+                );
+        
+                setTimeout(() => {
+                    checkOnlinePaymentStatus(donationId);
+                }, 2000);
+        
+            })
+            .catch(error => {
+        
+                console.error(
+                    'Payment status check failed:',
+                    error
+                );
+        
+                // Retry instead of leaving the donor
+                // stuck permanently.
+                setTimeout(() => {
+                    checkOnlinePaymentStatus(donationId);
+                }, 3000);
+            });
+        }
         
         // Unified confirmation screen display function
-        function showConfirmationScreen(amountDisplay, modeDisplay) {
+         function showConfirmationScreen(
+            amountDisplay,
+            modeDisplay,
+            donationId
+        ) {
             formHeader.classList.add('hidden');
             form.classList.add('hidden');
             confirmationPanel.classList.remove('hidden');
 
             confirmationTitle.textContent = 'Thank You!';
             confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Your payment has been successfully recorded and processed.`;
-            confirmationDonationId.textContent = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
+            confirmationDonationId.textContent =donationId;
             confirmationAmount.textContent = isNaN(amountDisplay) ? amountDisplay : `₹${amountDisplay}`;
             confirmationPaymentMode.textContent = modeDisplay;
             
@@ -427,20 +514,39 @@
         }
 
         downloadReceiptBtn.addEventListener('click', () => {
-            if (!currentReceiptUrl) return;
-            const match = currentReceiptUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            if (match && match[1]) {
-                const fileId = match[1];
-                let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } else {
-                window.open(currentReceiptUrl, '_blank');
+        
+            if (!currentReceiptUrl) {
+                alert('Receipt is not available yet.');
+                return;
             }
+        
+            const match =
+                currentReceiptUrl.match(
+                    /\/d\/([a-zA-Z0-9_-]+)/
+                );
+        
+            if (!match || !match[1]) {
+                window.open(currentReceiptUrl, '_blank');
+                return;
+            }
+        
+            const fileId = match[1];
+        
+            const downloadUrl =
+                `https://drive.google.com/uc?export=download&id=${fileId}`;
+        
+            const a = document.createElement('a');
+        
+            a.href = downloadUrl;
+        
+            a.download =
+                `Receipt-${confirmationDonationId.textContent}.pdf`;
+        
+            document.body.appendChild(a);
+        
+            a.click();
+        
+            a.remove();
         });
 
         newDonationBtn.addEventListener('click', () => {
