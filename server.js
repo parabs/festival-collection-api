@@ -120,7 +120,7 @@ async function updatePaymentInAppsScript({
       action: 'update_status',
       donationId: donationId,
       paymentStatus: 'Paid',
-      paymentReference: paymentId || paymentLinkId || '
+      paymentReference: paymentId || paymentLinkId || ''
     },
     {
       headers: {
@@ -375,8 +375,7 @@ app.post(
         await updatePaymentInAppsScript({
           donationId,
           paymentId,
-          paymentLinkId,
-          amount: amountPaid
+          paymentLinkId
         });
       
       return res.status(200).json({
