@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -189,7 +189,7 @@
 
     </div>
 
-<!-- Script to handle Dynamic Validation, JSON Response & Confirmation Screen -->
+    <!-- Script to handle Dynamic Validation, JSON Response & Confirmation Screen -->
     <script>
         const scriptURL = 'https://script.google.com/macros/s/AKfycbykO6OOQGNsJr4AZ9z6lGHQ06WX3YJDBJgbFKtOCdyGbHGd8fjncm5TT0dy28U0_ye1/exec';
 
@@ -220,54 +220,16 @@
             const urlParams = new URLSearchParams(window.location.search);
             const paymentStatus = urlParams.get('razorpay_payment_link_status');
             const paymentId = urlParams.get('razorpay_payment_id');
-            const returnedAmount = urlParams.get('amount');
-            const returnedMobile = urlParams.get('mobile');
 
-            if (paymentStatus === 'paid' || paymentId || returnedAmount) {
-                formHeader.classList.add('hidden');
-                form.classList.add('hidden');
-                confirmationPanel.classList.remove('hidden');
-
-                const finalDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-ONLINE";
-                
-                confirmationTitle.textContent = 'Contribution Successful ✓';
-                confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Payment verified via Razorpay. Your receipt is ready for download.`;
-                confirmationDonationId.textContent = finalDonationId;
-                confirmationAmount.textContent = returnedAmount ? `₹${returnedAmount}` : "Verified";
-                confirmationPaymentMode.textContent = "Online Payment";
-                
-                receiptAction.classList.remove('hidden');
-
-                // Send verified data ONCE to Google Sheets
-                const verifiedData = {
-                    formType: 'donation_form',
-                    autonomous: 'no',
-                    donorName: donorNameInput.value || 'Online Supporter',
-                    mobileNo: returnedMobile || '9876543210',
-                    amount: returnedAmount || '101',
-                    otherAmount: '',
-                    paymentMode: 'Online Payment'
-                };
-
-                // Clear query parameters instantly to prevent double-firing duplicates
+            if (paymentStatus === 'paid' || paymentId) {
+                // Clear query params from URL bar cleanly
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
-                fetch(scriptURL, {
-                    method: 'POST',
-                    body: new URLSearchParams(verifiedData)
-                })
-                .then(res => res.text())
-                .then(txt => {
-                    try {
-                        let resJson = JSON.parse(txt);
-                        if (resJson.receiptUrl) {
-                            currentReceiptUrl = resJson.receiptUrl;
-                        }
-                    } catch(e) {}
-                }).catch(err => console.error("Sheets sync error:", err));
+                // Show identical confirmation UI as Cash mode
+                showConfirmationScreen("Online Payment Confirmed", "Online Payment");
             }
         });
-
+        
         // Toggle required fields
         autonomousRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
@@ -285,7 +247,7 @@
             });
         });
 
-        // Form submission event
+       // Form submission event
         form.addEventListener('submit', e => {
             e.preventDefault();
             submitBtn.disabled = true;
@@ -297,52 +259,52 @@
             const isAnonymous = form.querySelector('input[name="autonomous"]:checked').value === 'yes';
             
             const finalAmount = selectedAmountVal === 'other' ? otherAmountVal : selectedAmountVal;
+            const enteredName = isAnonymous ? 'Anonymous' : (donorNameInput.value.trim() || 'Supporter');
+            let mobileNumber = mobileNoInput.value.trim() || '9892805337';
 
-            let mobileNumber = mobileNoInput.value.trim();
-            if (paymentModeVal === 'Online Payment' && isAnonymous && (!mobileNumber || mobileNumber.length < 10)) {
-                mobileNumber = "9892805337"; 
-            }
-
-            if (paymentModeVal === 'Online Payment') {
-                openRazorpayCheckout(finalAmount, mobileNumber);
-                return;
-            }
-
+            // 1. ALWAYS LOG TO "Form Responses 1" FIRST FOR ALL MODES
             const formData = {
-                formType: 'donation_form',
                 autonomous: isAnonymous ? 'yes' : 'no',
-                donorName: isAnonymous ? 'Anonymous' : donorNameInput.value,
-                mobileNo: mobileNoInput.value,
-                amount: selectedAmountVal,
-                otherAmount: otherAmountVal,
+                donorName: enteredName,
+                mobileNo: mobileNumber,
+                amount: finalAmount,
                 paymentMode: paymentModeVal
             };
 
-            sendDataToGoogleSheets(formData);
-        });
+            // Submit initial record to Google Sheet
+            fetch(scriptURL, {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            })
+            .then(response => response.text())
+            .then(text => {
+                // 2. IF ONLINE PAYMENT: Generate Razorpay link and redirect
+                if (paymentModeVal === 'Online Payment') {
+                    openRazorpayCheckout(finalAmount, mobileNumber);
+                    return;
+                }
 
-        // Render API Integration with dynamic callback parameters
-        function openRazorpayCheckout(amountInRupees, mobileNumber) {
-            const numericAmount = parseFloat(amountInRupees);
-            if (isNaN(numericAmount) || numericAmount <= 0) {
-                alert('Please select a valid donation amount.');
+                // 3. IF CASH: Show confirmation screen directly
+                showConfirmationScreen(finalAmount, paymentModeVal);
+            })
+            .catch(error => {
+                alert('Error submitting form: ' + error.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
-                return;
-            }
+            });
+        });
 
+        // Render API Integration
+        function openRazorpayCheckout(amountInRupees, mobileNumber) {
+            const numericAmount = parseFloat(amountInRupees);
             const tempDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
-
-            // Append amount and mobile so the return page captures them accurately
-            const baseRedirectUrl = window.location.origin + window.location.pathname;
-            const customCallbackUrl = `${baseRedirectUrl}?amount=${numericAmount}&mobile=${encodeURIComponent(mobileNumber)}`;
 
             const payload = {
                 apiKey: "TEST_KEY_123",
                 donationId: tempDonationId,
                 mobile: mobileNumber,
                 amount: numericAmount,
-                callback_url: customCallbackUrl
+                callback_url: window.location.origin + window.location.pathname // Returns cleanly back here
             };
 
             fetch("https://festival-collection-api.onrender.com/api/generate-link", {
@@ -350,26 +312,40 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             })
-            .then(response => {
-                if (!response.ok) throw new Error("Server responded with status " + response.status);
-                return response.json();
-            })
+            .then(res => res.json())
             .then(data => {
-                const paymentUrl = data.payment_link || data.url || data.link || data.short_url;
-                if (paymentUrl && paymentUrl.startsWith('http')) {
+                const paymentUrl = data.payment_link || data.short_url;
+                if (paymentUrl) {
                     window.location.href = paymentUrl;
                 } else {
-                    throw new Error("API response did not contain a valid payment link property.");
+                    throw new Error("Failed to retrieve payment link.");
                 }
             })
-            .catch(error => {
-                console.error("Payment Gateway Error:", error);
-                alert('Error connecting to payment gateway: ' + error.message);
+            .catch(err => {
+                alert('Payment Gateway Error: ' + err.message);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
             });
         }
         
+        // Unified confirmation screen display function
+        function showConfirmationScreen(amountDisplay, modeDisplay) {
+            formHeader.classList.add('hidden');
+            form.classList.add('hidden');
+            confirmationPanel.classList.remove('hidden');
+
+            confirmationTitle.textContent = 'Thank You!';
+            confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Your payment has been successfully recorded and processed.`;
+            confirmationDonationId.textContent = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
+            confirmationAmount.textContent = isNaN(amountDisplay) ? amountDisplay : `₹${amountDisplay}`;
+            confirmationPaymentMode.textContent = modeDisplay;
+            
+            receiptAction.classList.remove('hidden');
+            onlinePaymentAction.classList.add('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+        }
+
         function sendDataToGoogleSheets(formData) {
             fetch(scriptURL, {
                 method: 'POST',
@@ -389,29 +365,7 @@
                 }
 
                 currentReceiptUrl = result.receiptUrl || '';
-
-                confirmationDonationId.textContent = result.donationId;
-                confirmationAmount.textContent = result.amount;
-                confirmationPaymentMode.textContent = result.paymentMode;
-
-                receiptAction.classList.add('hidden');
-                onlinePaymentAction.classList.add('hidden');
-
-                if (currentReceiptUrl) {
-                    confirmationTitle.textContent = 'Contribution Successful ✓';
-                    confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>✅ Your payment is confirmed and your receipt is ready for download.`;
-                    receiptAction.classList.remove('hidden');
-                } else {
-                    confirmationTitle.textContent = 'Contribution Recorded ✓';
-                    confirmationMessage.innerHTML = `Thank you for your contribution.<br><br>⏳ Your payment is being verified.`;
-                }
-
-                formHeader.classList.add('hidden');
-                form.classList.add('hidden');
-                confirmationPanel.classList.remove('hidden');
-
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit';
+                showConfirmationScreen(result.amount, result.paymentMode);
             })
             .catch(error => {
                 alert('Error submitting form: ' + error.message);
