@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -215,7 +215,7 @@
 
         let currentReceiptUrl = '';
 
-        // Check if user just returned from Razorpay redirect
+        // Check return parameters from Razorpay redirect
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const paymentStatus = urlParams.get('razorpay_payment_link_status');
@@ -238,7 +238,7 @@
                 
                 receiptAction.classList.remove('hidden');
 
-                // Send the verified online payment record ONCE to Google Sheets
+                // Send verified data ONCE to Google Sheets
                 const verifiedData = {
                     formType: 'donation_form',
                     autonomous: 'no',
@@ -251,10 +251,9 @@
                     paymentReference: paymentId || 'Razorpay Link'
                 };
 
-                // Prevent duplicate firing by cleaning URL parameters instantly
+                // Clear query parameters instantly to prevent double-firing duplicates
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
-                // Log to Google Sheets silently
                 fetch(scriptURL, {
                     method: 'POST',
                     body: new URLSearchParams(verifiedData)
@@ -271,7 +270,7 @@
             }
         });
 
-        // Toggle required fields based on Anonymous selection
+        // Toggle required fields
         autonomousRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
                 if (e.target.value === 'yes') {
@@ -288,7 +287,7 @@
             });
         });
 
-        // Submit form data
+        // Form submission event
         form.addEventListener('submit', e => {
             e.preventDefault();
             submitBtn.disabled = true;
@@ -326,7 +325,7 @@
             sendDataToGoogleSheets(formData);
         });
 
-        // Render API Integration for Online Payment
+        // Render API Integration with dynamic callback parameters
         function openRazorpayCheckout(amountInRupees, mobileNumber) {
             const numericAmount = parseFloat(amountInRupees);
             if (isNaN(numericAmount) || numericAmount <= 0) {
@@ -338,7 +337,7 @@
 
             const tempDonationId = "FC-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + Math.floor(1000 + Math.random() * 9000);
 
-            // Pass amount and mobile back in query parameters so return handler catches them accurately
+            // Append amount and mobile so the return page captures them accurately
             const baseRedirectUrl = window.location.origin + window.location.pathname;
             const customCallbackUrl = `${baseRedirectUrl}?amount=${numericAmount}&mobile=${encodeURIComponent(mobileNumber)}`;
 
@@ -352,20 +351,15 @@
 
             fetch("https://festival-collection-api.onrender.com/api/generate-link", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             })
             .then(response => {
-                if (!response.ok) {
-                    throw new Error("Server responded with status " + response.status);
-                }
+                if (!response.ok) throw new Error("Server responded with status " + response.status);
                 return response.json();
             })
             .then(data => {
                 const paymentUrl = data.payment_link || data.url || data.link || data.short_url;
-
                 if (paymentUrl && paymentUrl.startsWith('http')) {
                     window.location.href = paymentUrl;
                 } else {
@@ -398,13 +392,11 @@
                     throw new Error(result.error || 'Unable to process donation.');
                 }
 
-                const paymentMode = result.paymentMode;
-                const donationId = result.donationId;
                 currentReceiptUrl = result.receiptUrl || '';
 
-                confirmationDonationId.textContent = donationId;
+                confirmationDonationId.textContent = result.donationId;
                 confirmationAmount.textContent = result.amount;
-                confirmationPaymentMode.textContent = paymentMode;
+                confirmationPaymentMode.textContent = result.paymentMode;
 
                 receiptAction.classList.add('hidden');
                 onlinePaymentAction.classList.add('hidden');
@@ -434,13 +426,10 @@
 
         downloadReceiptBtn.addEventListener('click', () => {
             if (!currentReceiptUrl) return;
-
             const match = currentReceiptUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            
             if (match && match[1]) {
                 const fileId = match[1];
                 let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-
                 const a = document.createElement('a');
                 a.href = downloadUrl;
                 a.download = `Receipt-${confirmationDonationId.textContent}.pdf`;
@@ -466,10 +455,7 @@
             donorNameInput.setAttribute('required', 'true');
             mobileNoInput.setAttribute('required', 'true');
 
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     </script>
 </body>
