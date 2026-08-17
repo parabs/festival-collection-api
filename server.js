@@ -100,8 +100,7 @@ function validateApiKey(req, res, next) {
 async function updatePaymentInAppsScript({
   donationId,
   paymentId,
-  paymentLinkId,
-  amount
+  paymentLinkId
 }) {
   const appsScriptUrl =
     process.env.APPS_SCRIPT_PAYMENT_URL;
@@ -118,10 +117,10 @@ async function updatePaymentInAppsScript({
   const response = await axios.post(
     `${appsScriptUrl}?token=${encodeURIComponent(token)}`,
     {
-      donationId,
-      paymentId,
-      paymentLinkId,
-      amount
+      action: 'update_status',
+      donationId: donationId,
+      paymentStatus: 'Paid',
+      paymentReference: paymentId || paymentLinkId || '
     },
     {
       headers: {
