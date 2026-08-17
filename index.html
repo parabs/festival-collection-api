@@ -327,8 +327,8 @@
                     );
                 }
         
-                // CASH
-                if (paymentMode === 'Cash') {
+                // CASH or UPI
+                if (paymentMode === 'UPI' || paymentMode === 'Cash') {
         
                     currentReceiptUrl =
                         result.receiptUrl || '';
