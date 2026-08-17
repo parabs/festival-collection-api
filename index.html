@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -277,18 +277,24 @@
             let mobileNumber = mobileNoInput.value.trim() || '9892805337';
 
             const formData = {
-                autonomous: isAnonymous ? 'yes' : 'no',
-                donorName: enteredName,
-                mobileNo: mobileNumber,
-                amount: finalAmount,
-                paymentMode: paymentModeVal
+                formType: 'donation_form',
+                autonomous: form.querySelector('input[name="autonomous"]:checked').value,
+                donorName: donorNameInput.value,
+                mobileNo: mobileNoInput.value,
+                amount: form.querySelector('input[name="amount"]:checked').value,
+                otherAmount: document.getElementById('otherAmount').value,
+                paymentMode: form.querySelector('select[name="paymentMode"]').value
             };
 
             // 1. Submit initial record to Google Sheet to obtain the backend-generated donationId
             fetch(scriptURL, {
                 method: 'POST',
-                body: new URLSearchParams(formData)
-            })
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: new URLSearchParams(formData).toString()
+            });
             .then(response => response.text())
             .then(text => {
                 let result;
