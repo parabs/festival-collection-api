@@ -216,24 +216,66 @@
 
         // Check return parameters from Razorpay redirect
         window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const paymentStatus = urlParams.get('razorpay_payment_link_status');
-            const paymentId = urlParams.get('razorpay_payment_id');
-            const savedDonationId = localStorage.getItem('pendingDonationId');
-
-            if ((paymentStatus === 'paid' || paymentId) && savedDonationId) {
-                // Clear query params from URL bar cleanly
-                window.history.replaceState({}, document.title, window.location.pathname);
-                
-                // Send UPDATE request to Apps Script instead of creating a new row
-                const updateData = {
-                    action: 'update_status',
-                    donationId: savedDonationId,
-                    paymentStatus: 'Paid',
-                    paymentReference: paymentId || 'Online Payment'
-                };
-
+        
+            const urlParams =
+                new URLSearchParams(window.location.search);
+        
+            const razorpayPaymentId =
+                urlParams.get('razorpay_payment_id');
+        
+            const razorpayPaymentLinkId =
+                urlParams.get('razorpay_payment_link_id');
+        
+            const razorpayDonationId =
+                urlParams.get('razorpay_payment_link_reference_id');
+        
+            const razorpayPaymentStatus =
+                urlParams.get('razorpay_payment_link_status');
+        
+            const isRazorpayReturn =
+                !!razorpayPaymentId ||
+                !!razorpayPaymentLinkId ||
+                !!razorpayDonationId;
+        
+            if (!isRazorpayReturn) {
+                return;
             }
+        
+            console.log(
+                '🔄 Razorpay return detected'
+            );
+        
+            console.log(
+                'Donation ID:',
+                razorpayDonationId
+            );
+        
+            console.log(
+                'Payment ID:',
+                razorpayPaymentId
+            );
+        
+            console.log(
+                'Razorpay status:',
+                razorpayPaymentStatus
+            );
+        
+            // Store the Donation ID for the next step.
+            if (razorpayDonationId) {
+                localStorage.setItem(
+                    'pendingDonationId',
+                    razorpayDonationId
+                );
+            }
+        
+            // IMPORTANT:
+            // Do NOT submit the donation form again.
+            // Do NOT call openRazorpayCheckout().
+            // Do NOT mark the payment Paid here.
+            //
+            // The Razorpay webhook is the authoritative
+            // source for payment confirmation.
+        
         });
         
         // Toggle required fields
