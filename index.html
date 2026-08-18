@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Support Contribution Form</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Razorpay Checkout -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
 
@@ -16,7 +14,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -382,41 +380,79 @@
         });
 
         // Render API Integration
-        function openRazorpayCheckout(amountInRupees, mobileNumber, generatedDonationId) {
-            const numericAmount = parseFloat(amountInRupees);
-
-            // Save donation ID locally so we can reference it when user returns from Razorpay
-            localStorage.setItem('pendingDonationId', generatedDonationId);
-
+         function openRazorpayCheckout(
+            amountInRupees,
+            mobileNumber,
+            generatedDonationId
+        ) {
+        
+            const numericAmount =
+                parseFloat(amountInRupees);
+        
+            localStorage.setItem(
+                'pendingDonationId',
+                generatedDonationId
+            );
+        
             const payload = {
                 apiKey: "TEST_KEY_123",
                 donationId: generatedDonationId,
                 mobile: mobileNumber,
                 amount: numericAmount,
-                callback_url: window.location.origin + window.location.pathname
+                callback_url:
+                    window.location.origin +
+                    window.location.pathname
             };
-
-            fetch("https://festival-collection-api.onrender.com/api/generate-link", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                const paymentUrl = data.payment_link || data.short_url;
-                if (paymentUrl) {
-                    window.location.href = paymentUrl;
-                } else {
-                    throw new Error("Failed to retrieve payment link.");
-                }
-            })
-            .catch(err => {
-                alert('Payment Gateway Error: ' + err.message);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit';
-            });
+        
+            loadRazorpayCheckout()
+                .then(() => {
+        
+                    return fetch(
+                        "https://festival-collection-api.onrender.com/api/generate-link",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+                            body: JSON.stringify(payload)
+                        }
+                    );
+        
+                })
+                .then(res => res.json())
+                .then(data => {
+        
+                    const paymentUrl =
+                        data.payment_link ||
+                        data.short_url;
+        
+                    if (paymentUrl) {
+                        window.location.href =
+                            paymentUrl;
+                    } else {
+                        throw new Error(
+                            "Failed to retrieve payment link."
+                        );
+                    }
+        
+                })
+                .catch(err => {
+        
+                    console.error(
+                        'Payment Gateway Error:',
+                        err
+                    );
+        
+                    alert(
+                        'Payment Gateway Error: ' +
+                        err.message
+                    );
+        
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit';
+                });
         }
-
               
         // Unified confirmation screen display function
          function showConfirmationScreen(
