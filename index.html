@@ -14,7 +14,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -379,13 +379,12 @@
             });
         });
 
-        // Render API Integration
-         function openRazorpayCheckout(
+        // Razorpay Payment Link
+        function openRazorpayCheckout(
             amountInRupees,
             mobileNumber,
             generatedDonationId
         ) {
-        
             const numericAmount =
                 parseFloat(amountInRupees);
         
@@ -404,54 +403,47 @@
                     window.location.pathname
             };
         
-            loadRazorpayCheckout()
-                .then(() => {
+            fetch(
+                "https://festival-collection-api.onrender.com/api/generate-link",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                }
+            )
+            .then(res => res.json())
+            .then(data => {
         
-                    return fetch(
-                        "https://festival-collection-api.onrender.com/api/generate-link",
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-                            body: JSON.stringify(payload)
-                        }
+                const paymentUrl =
+                    data.payment_link ||
+                    data.short_url;
+        
+                if (paymentUrl) {
+                    window.location.href = paymentUrl;
+                } else {
+                    throw new Error(
+                        "Failed to retrieve payment link."
                     );
+                }
         
-                })
-                .then(res => res.json())
-                .then(data => {
+            })
+            .catch(err => {
         
-                    const paymentUrl =
-                        data.payment_link ||
-                        data.short_url;
+                console.error(
+                    'Payment Gateway Error:',
+                    err
+                );
         
-                    if (paymentUrl) {
-                        window.location.href =
-                            paymentUrl;
-                    } else {
-                        throw new Error(
-                            "Failed to retrieve payment link."
-                        );
-                    }
+                alert(
+                    'Payment Gateway Error: ' +
+                    err.message
+                );
         
-                })
-                .catch(err => {
-        
-                    console.error(
-                        'Payment Gateway Error:',
-                        err
-                    );
-        
-                    alert(
-                        'Payment Gateway Error: ' +
-                        err.message
-                    );
-        
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit';
-                });
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+            });
         }
               
         // Unified confirmation screen display function
