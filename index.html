@@ -16,7 +16,7 @@
         <div id="formHeader" class="px-6 py-6 sm:px-8 bg-white border-b border-gray-100">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Community Support Contribution Form</h1>
             <p class="mt-2 text-sm text-gray-600">
-                Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
+                v1 Thank you for your generosity. Please complete this form to process your donation towards our community development initiatives.
             </p>
             <div class="mt-3 text-xs text-red-500 font-medium">* Indicates required question</div>
         </div>
@@ -235,9 +235,6 @@
                     paymentReference: paymentId || 'Online Payment'
                 };
 
-                // Wait for the server-side Razorpay webhook
-                // to confirm payment and generate the receipt.
-                checkOnlinePaymentStatus(savedDonationId);
             }
         });
         
@@ -420,77 +417,7 @@
             });
         }
 
-        // Check server-side payment status and wait for receipt
-        function checkOnlinePaymentStatus(donationId) {
-        
-            fetch(
-                scriptURL +
-                '?action=get_donation&donationId=' +
-                encodeURIComponent(donationId)
-            )
-            .then(response => response.json())
-            .then(result => {
-        
-                console.log(
-                    'Payment status check:',
-                    result
-                );
-        
-                if (!result.success) {
-                    throw new Error(
-                        result.error ||
-                        'Unable to check payment status.'
-                    );
-                }
-        
-                // Payment confirmed AND receipt generated
-                if (
-                    result.paymentStatus === 'Paid' &&
-                    result.receiptUrl
-                ) {
-        
-                    currentReceiptUrl =
-                        result.receiptUrl;
-        
-                    localStorage.removeItem(
-                        'pendingDonationId'
-                    );
-        
-                    showConfirmationScreen(
-                        result.amount,
-                        'Online Payment',
-                        result.donationId
-                    );
-        
-                    return;
-                }
-        
-                // Payment may be confirmed but receipt
-                // generation is still in progress.
-                console.log(
-                    'Payment/receipt not ready yet. Retrying...'
-                );
-        
-                setTimeout(() => {
-                    checkOnlinePaymentStatus(donationId);
-                }, 2000);
-        
-            })
-            .catch(error => {
-        
-                console.error(
-                    'Payment status check failed:',
-                    error
-                );
-        
-                // Retry instead of leaving the donor
-                // stuck permanently.
-                setTimeout(() => {
-                    checkOnlinePaymentStatus(donationId);
-                }, 3000);
-            });
-        }
-        
+              
         // Unified confirmation screen display function
          function showConfirmationScreen(
             amountDisplay,
